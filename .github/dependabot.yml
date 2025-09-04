@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: ":seedling:"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/tcp-forwarder"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: ":robot:"
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
+

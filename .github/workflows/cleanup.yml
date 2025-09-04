@@ -1,0 +1,28 @@
+name: Container Cleanup
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: 'Maximum age in days for containers to keep'
+        required: false
+        default: '30'
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup old container images
+        run: |
+          echo "🧹 Container cleanup will be implemented using GitHub API"
+          echo "For now, this is a placeholder to avoid complex package management"
+          echo "You can implement this later using the GitHub API or retention policies"
+          echo "Current containers in repository:"
+          echo "- tcp-forwarder"
