@@ -1,0 +1,40 @@
+name: Container Cleanup
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: 'Maximum age in days for containers to keep'
+        required: false
+        default: '30'
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old container images
+        uses: actions/delete-package-versions@c79a5c3da2d0ec7d1f5c7d19e90bb6a2f74c6bb0 # v5.1.1
+        with:
+          package-name: 'container-images/tcp-forwarder'
+          package-type: 'container'
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup-untagged:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete untagged container images
+        uses: actions/delete-package-versions@c79a5c3da2d0ec7d1f5c7d19e90bb6a2f74c6bb0 # v5.1.1
+        with:
+          package-name: 'container-images/*'
+          package-type: 'container'
+          delete-only-untagged-versions: true
+          token: ${{ secrets.GITHUB_TOKEN }}

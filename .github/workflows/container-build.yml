@@ -1,0 +1,270 @@
+name: Container Build & Publish
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      containers:
+        description: 'Comma-separated list of containers to build (leave empty for all)'
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  discover-containers:
+    runs-on: ubuntu-latest
+    outputs:
+      containers: ${{ steps.discover.outputs.containers }}
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Discover containers
+        id: discover
+        run: |
+          set -e
+
+          # Find all directories containing Dockerfiles
+          containers=()
+          for dir in */; do
+            if [[ -f "${dir}Dockerfile" ]]; then
+              container_name=$(basename "$dir")
+              containers+=("$container_name")
+            fi
+          done
+
+          # Filter containers if specified in workflow_dispatch
+          if [[ -n "${{ github.event.inputs.containers }}" ]]; then
+            IFS=',' read -ra specified_containers <<< "${{ github.event.inputs.containers }}"
+            filtered_containers=()
+            for container in "${containers[@]}"; do
+              for specified in "${specified_containers[@]}"; do
+                specified=$(echo "$specified" | xargs)  # trim whitespace
+                if [[ "$container" == "$specified" ]]; then
+                  filtered_containers+=("$container")
+                  break
+                fi
+              done
+            done
+            containers=("${filtered_containers[@]}")
+          fi
+
+          # Convert to JSON array
+          json_array=$(printf '%s\n' "${containers[@]}" | jq -R . | jq -s .)
+          echo "containers=${json_array}" >> "$GITHUB_OUTPUT"
+
+          # Create matrix
+          matrix=$(echo "${json_array}" | jq '{include: [.[] | {container: .}]}')
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+
+          echo "Discovered containers: ${containers[*]}"
+
+  build-and-push:
+    needs: discover-containers
+    if: needs.discover-containers.outputs.containers != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-containers.outputs.matrix) }}
+    outputs:
+      digest-${{ matrix.container }}: ${{ steps.build.outputs.digest }}
+      image-${{ matrix.container }}: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.container }}
+          tags: |
+            # nightly tag for scheduled builds
+            type=raw,value=nightly,enable={{is_default_branch}}
+            # sha tag for all builds
+            type=sha,prefix=sha-,format=short
+            # latest tag for main branch pushes (not scheduled)
+            type=raw,value=latest,enable={{is_default_branch}},priority=100
+          labels: |
+            org.opencontainers.image.title=${{ matrix.container }}
+            org.opencontainers.image.description=Container image for ${{ matrix.container }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: ./${{ matrix.container }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.container }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.container }}
+          platforms: linux/amd64,linux/arm64
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@da167eac915b4e86f08b264dbdbc867b61be6f0c # v0.20.5
+        with:
+          image: ghcr.io/${{ github.repository }}/${{ matrix.container }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: ${{ matrix.container }}-sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Sign container image
+        run: |
+          set -e
+          cosign sign --yes \
+            -a "repo=${{ github.repository }}" \
+            -a "workflow=${{ github.workflow }}" \
+            -a "ref=${{ github.sha }}" \
+            -a "container=${{ matrix.container }}" \
+            ghcr.io/${{ github.repository }}/${{ matrix.container }}@${{ steps.build.outputs.digest }}
+
+      - name: Attest SBOM
+        run: |
+          set -e
+          cosign attest --yes \
+            --predicate ./${{ matrix.container }}-sbom.cdx.json \
+            --type cyclonedx \
+            ghcr.io/${{ github.repository }}/${{ matrix.container }}@${{ steps.build.outputs.digest }}
+
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-${{ matrix.container }}
+          path: ${{ matrix.container }}-sbom.cdx.json
+          retention-days: 30
+
+  provenance:
+    needs: [discover-containers, build-and-push]
+    if: needs.discover-containers.outputs.containers != '[]'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-containers.outputs.matrix) }}
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ghcr.io/${{ github.repository }}/${{ matrix.container }}
+      digest: ${{ needs.build-and-push.outputs[format('digest-{0}', matrix.container)] }}
+      registry-username: ${{ github.actor }}
+      provenance-registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+      provenance-registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  verify:
+    needs: [discover-containers, build-and-push, provenance]
+    if: needs.discover-containers.outputs.containers != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-containers.outputs.matrix) }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify container signature
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.container }}
+          DIGEST: ${{ needs.build-and-push.outputs[format('digest-{0}', matrix.container)] }}
+        run: |
+          set -e
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/${{ github.repository }}/.github/workflows/container-build.yml@refs/.*$' \
+            $IMAGE@$DIGEST
+
+      - name: Verify SLSA provenance
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.container }}
+          DIGEST: ${{ needs.build-and-push.outputs[format('digest-{0}', matrix.container)] }}
+        run: |
+          set -e
+          cosign verify-attestation \
+            --type slsaprovenance \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v[0-9]+.[0-9]+.[0-9]+$' \
+            --policy policy.cue \
+            $IMAGE@$DIGEST
+
+      - name: Verify SBOM attestation
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.container }}
+          DIGEST: ${{ needs.build-and-push.outputs[format('digest-{0}', matrix.container)] }}
+        run: |
+          set -e
+          cosign verify-attestation \
+            --type cyclonedx \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/${{ github.repository }}/.github/workflows/container-build.yml@refs/.*$' \
+            $IMAGE@$DIGEST
+
+  summary:
+    needs: [discover-containers, build-and-push, verify]
+    if: always() && needs.discover-containers.outputs.containers != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Job Summary
+        run: |
+          echo "## 🚀 Container Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Ref:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SHA:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Built Containers" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          containers='${{ needs.discover-containers.outputs.containers }}'
+          echo "$containers" | jq -r '.[] | "- **" + . + "** - `ghcr.io/${{ github.repository }}/" + . + ":nightly`"' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.build-and-push.result }}" == "success" && "${{ needs.verify.result }}" == "success" ]]; then
+            echo "✅ All containers built, signed, and verified successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some containers failed to build or verify. Check the logs above." >> $GITHUB_STEP_SUMMARY
+          fi
