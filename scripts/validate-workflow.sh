@@ -81,6 +81,23 @@ else
 fi
 
 echo ""
+echo "🔗 Checking dependabot.yml sync..."
+dependabot_ok=true
+for container in "${containers[@]}"; do
+    if grep -q "directory: \"/${container}\"" .github/dependabot.yml 2>/dev/null; then
+        echo "  ✅ ${container} in dependabot.yml"
+    else
+        echo "  ❌ ${container} missing from dependabot.yml"
+        echo "     Run: bash .github/scripts/update-dependabot.sh"
+        dependabot_ok=false
+    fi
+done
+if [[ "$dependabot_ok" == "false" ]]; then
+    echo "❌ dependabot.yml is out of sync with discovered containers"
+    exit 1
+fi
+
+echo ""
 echo "📋 Registry URLs for containers:"
 for container in "${containers[@]}"; do
     echo "  📦 ghcr.io/natrontech/container-images/${container}:nightly"

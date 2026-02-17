@@ -10,7 +10,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     commit-message:
       prefix: ":seedling:"
     groups:
@@ -27,7 +27,7 @@ for dir in */; do
   - package-ecosystem: "docker"
     directory: "/${container_name}"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     commit-message:
       prefix: ":robot:"
     groups:

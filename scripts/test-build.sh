@@ -39,11 +39,27 @@ echo "🏷️  Image: $IMAGE_NAME"
 echo "🔖 SHA: $SHORT_SHA"
 echo ""
 
-docker build \
+if docker buildx inspect multiarch-builder >/dev/null 2>&1; then
+    echo "🔧 Using existing buildx builder: multiarch-builder"
+else
+    docker buildx create --name multiarch-builder --use >/dev/null 2>&1 || true
+fi
+
+docker buildx build \
+    --platform linux/amd64,linux/arm64 \
     -t "${IMAGE_NAME}:latest" \
     -t "${IMAGE_NAME}:sha-${SHORT_SHA}" \
     -t "${IMAGE_NAME}:test" \
-    "./${CONTAINER_NAME}"
+    --load \
+    "./${CONTAINER_NAME}" 2>/dev/null || {
+    echo "⚠️  Multi-arch --load not supported, building for current platform only"
+    docker buildx build \
+        -t "${IMAGE_NAME}:latest" \
+        -t "${IMAGE_NAME}:sha-${SHORT_SHA}" \
+        -t "${IMAGE_NAME}:test" \
+        --load \
+        "./${CONTAINER_NAME}"
+}
 
 echo "✅ Build completed successfully!"
 echo ""

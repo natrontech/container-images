@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     commit-message:
       prefix: ":seedling:"
     groups:
@@ -14,11 +14,10 @@ updates:
   - package-ecosystem: "docker"
     directory: "/tcp-forwarder"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     commit-message:
       prefix: ":robot:"
     groups:
       docker-dependencies:
         patterns:
           - "*"
-

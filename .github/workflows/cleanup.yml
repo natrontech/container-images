@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       max_age_days:
-        description: 'Maximum age in days for containers to keep'
+        description: 'Maximum age in days for untagged versions to keep'
         required: false
         default: '30'
         type: string
@@ -16,13 +16,97 @@ permissions:
   packages: write
 
 jobs:
-  cleanup:
+  discover-containers:
     runs-on: ubuntu-latest
+    outputs:
+      containers: ${{ steps.discover.outputs.containers }}
     steps:
-      - name: Cleanup old container images
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Discover containers
+        id: discover
         run: |
-          echo "🧹 Container cleanup will be implemented using GitHub API"
-          echo "For now, this is a placeholder to avoid complex package management"
-          echo "You can implement this later using the GitHub API or retention policies"
-          echo "Current containers in repository:"
-          echo "- tcp-forwarder"
+          set -e
+          containers=()
+          for dir in */; do
+            if [[ -f "${dir}Dockerfile" ]]; then
+              containers+=("$(basename "$dir")")
+            fi
+          done
+          json_array="["
+          for i in "${!containers[@]}"; do
+            if [ $i -gt 0 ]; then json_array+=","; fi
+            json_array+="\"${containers[$i]}\""
+          done
+          json_array+="]"
+          echo "containers=${json_array}" >> "$GITHUB_OUTPUT"
+
+  cleanup:
+    needs: discover-containers
+    if: needs.discover-containers.outputs.containers != '[]'
+    runs-on: ubuntu-latest
+    env:
+      MAX_AGE_DAYS: ${{ github.event.inputs.max_age_days || '30' }}
+    steps:
+      - name: Delete old untagged container versions
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const containers = ${{ needs.discover-containers.outputs.containers }};
+            const maxAgeDays = parseInt(process.env.MAX_AGE_DAYS);
+            const cutoffDate = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+            const org = context.repo.owner;
+
+            core.info(`Cleaning up versions older than ${maxAgeDays} days (before ${cutoffDate.toISOString()})`);
+
+            for (const container of containers) {
+              const packageName = `container-images/${container}`;
+              core.info(`\nProcessing package: ${packageName}`);
+
+              let versions;
+              try {
+                versions = await github.paginate(
+                  github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+                  { package_type: 'container', package_name: packageName, org }
+                );
+              } catch (err) {
+                core.warning(`Could not list versions for ${packageName}: ${err.message}`);
+                continue;
+              }
+
+              const protectedTags = ['latest', 'nightly'];
+              let deleted = 0;
+
+              for (const version of versions) {
+                const tags = version.metadata?.container?.tags || [];
+                const updatedAt = new Date(version.updated_at);
+
+                // Skip versions with protected tags
+                if (tags.some(t => protectedTags.includes(t))) continue;
+
+                // Delete untagged versions older than cutoff
+                if (tags.length === 0 && updatedAt < cutoffDate) {
+                  core.info(`  Deleting untagged version ${version.id} (updated ${updatedAt.toISOString()})`);
+                  try {
+                    await github.rest.packages.deletePackageVersionForOrg({
+                      package_type: 'container', package_name: packageName, org,
+                      package_version_id: version.id,
+                    });
+                    deleted++;
+                  } catch (err) {
+                    core.warning(`  Failed to delete version ${version.id}: ${err.message}`);
+                  }
+                }
+              }
+
+              core.info(`  Deleted ${deleted} old untagged version(s) for ${packageName}`);
+            }
+
+      - name: Summary
+        run: |
+          echo "## 🧹 Container Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Cleaned up untagged container versions older than **$MAX_AGE_DAYS days**." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Protected tags (never deleted): \`latest\`, \`nightly\`" >> $GITHUB_STEP_SUMMARY
