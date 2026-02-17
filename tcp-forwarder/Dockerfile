@@ -20,13 +20,14 @@ ENV HTTP_PORT="80"
 ENV HTTPS_PORT="443"
 ENV LOG_LEVEL="info"
 ENV HEALTH_CHECK_INTERVAL="30"
+ENV HEALTH_PORT="8080"
 
 # Simplified health check for Azure
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=5 \
   CMD /app/healthcheck.sh || exit 0
 
 # Expose ports
-EXPOSE 80 443
+EXPOSE 80 443 8080
 
 # Use custom entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
