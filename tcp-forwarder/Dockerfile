@@ -10,7 +10,9 @@ RUN apt-get update && \
 RUN groupadd -r forwarder && useradd -r -g forwarder -s /sbin/nologin forwarder
 
 # Allow socat to bind privileged ports as non-root
-RUN setcap 'cap_net_bind_service=+ep' /usr/bin/socat
+# Copy into current layer first — setcap can't set xattrs across overlayfs layers in BuildKit
+RUN cp /usr/bin/socat /usr/bin/socat.tmp && mv /usr/bin/socat.tmp /usr/bin/socat && \
+    setcap 'cap_net_bind_service=+ep' /usr/bin/socat
 
 # Create app directory
 WORKDIR /app
