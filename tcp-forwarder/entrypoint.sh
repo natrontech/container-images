@@ -117,7 +117,7 @@ main() {
 
     # Start health check HTTP responder
     log "INFO" "Starting health check responder on port $HEALTH_PORT"
-    socat TCP-LISTEN:$HEALTH_PORT,fork,reuseaddr EXEC:'printf "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK"' &
+    socat TCP-LISTEN:$HEALTH_PORT,fork,reuseaddr SYSTEM:'printf "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK"' &
     HEALTH_PID=$!
 
     # Start HTTPS forwarder
