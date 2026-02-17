@@ -87,11 +87,11 @@ trap cleanup SIGTERM SIGINT
 
 # Set socat log level based on LOG_LEVEL
 case $LOG_LEVEL in
-    "debug") SOCAT_OPTS="-v -d -d -d" ;;
-    "info")  SOCAT_OPTS="-v -d" ;;
+    "debug") SOCAT_OPTS="-v -d -d" ;;
+    "info")  SOCAT_OPTS="-d" ;;
     "warn")  SOCAT_OPTS="-d" ;;
     "error") SOCAT_OPTS="" ;;
-    *) SOCAT_OPTS="-v -d" ;;
+    *) SOCAT_OPTS="-d" ;;
 esac
 
 main() {
@@ -117,7 +117,7 @@ main() {
 
     # Start health check HTTP responder
     log "INFO" "Starting health check responder on port $HEALTH_PORT"
-    socat TCP-LISTEN:$HEALTH_PORT,fork,reuseaddr SYSTEM:'echo "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK"' &
+    socat TCP-LISTEN:$HEALTH_PORT,fork,reuseaddr EXEC:'printf "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK"' &
     HEALTH_PID=$!
 
     # Start HTTPS forwarder
