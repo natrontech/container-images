@@ -153,7 +153,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad # v0.22.2
+        uses: anchore/sbom-action@17ae1740179002c89186b61233e0f892c3118b11 # v0.23.0
         with:
           image: ghcr.io/${{ github.repository }}/${{ matrix.container }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
@@ -180,7 +180,7 @@ jobs:
             ghcr.io/${{ github.repository }}/${{ matrix.container }}@${{ steps.build.outputs.digest }}
 
       - name: Upload SBOM as artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: sbom-${{ matrix.container }}
           path: ${{ matrix.container }}-sbom.cdx.json
@@ -193,7 +193,7 @@ jobs:
           echo "${{ steps.meta.outputs.tags }}" > "./outputs/${{ matrix.container }}-image.txt"
 
       - name: Upload build outputs
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: build-outputs-${{ matrix.container }}
           path: ./outputs/
