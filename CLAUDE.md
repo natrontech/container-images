@@ -31,7 +31,7 @@ pre-commit run --all-files
 
 **Security chain:** Every image is signed with Cosign (keyless/OIDC) and gets a CycloneDX SBOM attestation. Versioned images (with a `VERSION` file) additionally get SLSA Level 3 provenance. Verification policies are in `policy.cue` (SLSA) and `policy-sbom.cue` (SBOM).
 
-**Multi-arch:** All images build for `linux/amd64` and `linux/arm64` via Docker Buildx.
+**Multi-arch:** Images build for `linux/amd64,linux/arm64` by default. Add a `PLATFORMS` file (comma-separated) to override for a specific container (e.g. `linux/amd64` only).
 
 **Tagging:** `:nightly` (scheduled), `:sha-<commit>` (push to main, immutable), `:<version>` (push to main if `VERSION` file exists, immutable), `:latest` (push to main + nightly).
 
@@ -40,9 +40,10 @@ pre-commit run --all-files
 1. Create a directory at the repo root: `mkdir <name>`
 2. Add a `Dockerfile` inside it
 3. Optionally add a `VERSION` file (e.g. `1.0.0`) to publish an immutable version tag and SLSA provenance
-4. Add a docker entry for the new directory to `.github/dependabot.yml`
-5. Push to main — auto-discovered on next build
-6. Run `./scripts/validate-workflow.sh` to verify discovery works locally
+4. Optionally add a `PLATFORMS` file to restrict platforms (default: `linux/amd64,linux/arm64`)
+5. Add a docker entry for the new directory to `.github/dependabot.yml`
+6. Push to main — auto-discovered on next build
+7. Run `./scripts/validate-workflow.sh` to verify discovery works locally
 
 ## Conventions
 

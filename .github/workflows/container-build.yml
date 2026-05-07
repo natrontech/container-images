@@ -81,6 +81,7 @@ jobs:
 
           build_json_array() {
             local -n arr=$1
+            local include_platforms=$2
             local json_array matrix
             if [ ${#arr[@]} -eq 0 ]; then
               json_array='[]'
@@ -96,7 +97,16 @@ jobs:
               matrix='{"include":['
               for i in "${!arr[@]}"; do
                 [ $i -gt 0 ] && matrix+=","
-                matrix+="{\"container\":\"${arr[$i]}\"}"
+                container="${arr[$i]}"
+                if [[ "$include_platforms" == "true" ]]; then
+                  platforms="linux/amd64,linux/arm64"
+                  if [[ -f "${container}/PLATFORMS" ]]; then
+                    platforms=$(cat "${container}/PLATFORMS" | tr -d '[:space:]')
+                  fi
+                  matrix+="{\"container\":\"${container}\",\"platforms\":\"${platforms}\"}"
+                else
+                  matrix+="{\"container\":\"${container}\"}"
+                fi
               done
               matrix+=']}'
             fi
@@ -104,8 +114,8 @@ jobs:
             echo "$matrix"
           }
 
-          { read -r json_array; read -r matrix; } < <(build_json_array containers)
-          { read -r versioned_json_array; read -r versioned_matrix; } < <(build_json_array versioned_containers)
+          { read -r json_array; read -r matrix; } < <(build_json_array containers true)
+          { read -r versioned_json_array; read -r versioned_matrix; } < <(build_json_array versioned_containers false)
 
           echo "containers=${json_array}" >> "$GITHUB_OUTPUT"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
@@ -196,7 +206,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.container }}
           cache-to: type=gha,mode=max,scope=${{ matrix.container }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platforms }}
 
       - name: Generate SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
