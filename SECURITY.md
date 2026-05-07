@@ -89,21 +89,26 @@ cosign verify-attestation \
   $IMAGE | jq
 ```
 
+Download the SLSA provenance:
+
+```bash
+cosign verify-attestation \
+  --type slsaprovenance \
+  --new-bundle-format=false \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v[0-9]+.[0-9]+.[0-9]+$' \
+  --policy policy.cue \
+  $IMAGE | jq -r '.payload' | base64 -d | jq > slsa-provenance.json
+```
+
 **Verify with `slsa-verifier`**
 
 As an alternative to `cosign`, you can also use the [SLSA Verifier](https://github.com/slsa-framework/slsa-verifier) to verify the provenance of the container images.
 
 ```bash
-VERSION=<version-tag-without-colon> # e.g. 5.4.1
-IMAGE=ghcr.io/natrontech/container-images/<image-name>:$VERSION
-
-# get the image digest and append it to the image name
-IMAGE="${IMAGE}@"$(crane digest "${IMAGE}")
-
 # verify the image
 slsa-verifier verify-image \
   --source-uri github.com/natrontech/container-images \
-  --source-versioned-tag $VERSION \
   $IMAGE
 ```
 
