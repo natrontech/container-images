@@ -32,7 +32,7 @@ discover-containers
 - Versioned images (with a `VERSION` file) additionally get SLSA Level 3 provenance
 - Signature, SBOM, and provenance are verified in the `verify` job before the pipeline completes
 
-**Multi-arch:** `linux/amd64` and `linux/arm64`
+**Multi-arch:** `linux/amd64,linux/arm64` by default. A `PLATFORMS` file in the container directory overrides this (e.g. `linux/amd64` only).
 
 ---
 
