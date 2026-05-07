@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coraza-config
+  namespace: nginx-ingress
+data:
+  coraza.conf: |
+    # Rule engine mode: DetectionOnly (log only) or On (block)
+    SecRuleEngine DetectionOnly
+    SecRequestBodyAccess On
+    SecResponseBodyAccess Off
+    SecRequestBodyLimit 13107200
+    SecRequestBodyNoFilesLimit 131072
+    SecDebugLogLevel 0
+    SecAuditEngine RelevantOnly
+    SecAuditLog /dev/stdout
+    SecAuditLogFormat JSON
+    SecAuditLogParts ABIFHZ

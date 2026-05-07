@@ -1,0 +1,23 @@
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: podinfo-vs-per-route
+  namespace: coraza-demo
+spec:
+  host: coraza-vs-per-route.local
+  ingressClassName: nginx-ingress
+  upstreams:
+  - name: podinfo
+    service: podinfo
+    port: 9898
+  routes:
+  # /api — WAF disabled (e.g. high-volume internal API or trusted upstream)
+  - path: /api
+    location-snippets: |
+      coraza off;
+    action:
+      pass: podinfo
+  # / — WAF active (inherited from global server-snippets)
+  - path: /
+    action:
+      pass: podinfo

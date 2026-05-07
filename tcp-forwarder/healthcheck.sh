@@ -8,7 +8,7 @@ if ! pgrep -f "tcp-listen:443" > /dev/null; then
 fi
 
 if ! pgrep -f "tcp-listen:80" > /dev/null; then
-    echo "HTTP forwarder not running"  
+    echo "HTTP forwarder not running"
     exit 1
 fi
 

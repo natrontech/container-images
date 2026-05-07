@@ -16,9 +16,6 @@ A collection of utility container images built and published nightly to GitHub C
 # Validate repository structure and container discovery
 ./scripts/validate-workflow.sh
 
-# Test container discovery logic (JSON matrix generation)
-./test-discovery.sh
-
 # Install pre-commit hooks
 pre-commit install
 
@@ -30,21 +27,22 @@ pre-commit run --all-files
 
 **Auto-discovery build system:** The CI workflow (`container-build.yml`) scans for directories containing a `Dockerfile` at the repo root. Directory name becomes the image name. No manual workflow configuration is needed when adding new containers.
 
-**CI pipeline jobs:** `discover-containers` → `build-and-push` (matrix) → `provenance` → `verify` → `summary`
+**CI pipeline jobs:** `discover-containers` → `build-and-push` (matrix) → `collect-digests` → `provenance` (versioned only) → `verify` → `summary`
 
-**Security chain:** Every image is signed with Cosign (keyless/OIDC), gets a CycloneDX SBOM, and SLSA Level 3 provenance attestation. Verification policy is defined in `policy.cue`.
+**Security chain:** Every image is signed with Cosign (keyless/OIDC) and gets a CycloneDX SBOM attestation. Versioned images (with a `VERSION` file) additionally get SLSA Level 3 provenance. Verification policies are in `policy.cue` (SLSA) and `policy-sbom.cue` (SBOM).
 
 **Multi-arch:** All images build for `linux/amd64` and `linux/arm64` via Docker Buildx.
 
-**Tagging:** `:nightly` (scheduled), `:sha-<commit>`, `:latest` (push to main).
+**Tagging:** `:nightly` (scheduled), `:sha-<commit>` (push to main, immutable), `:<version>` (push to main if `VERSION` file exists, immutable), `:latest` (push to main + nightly).
 
 ## Adding a New Container Image
 
 1. Create a directory at the repo root: `mkdir <name>`
 2. Add a `Dockerfile` inside it
-3. Optionally add `entrypoint.sh`, `healthcheck.sh`
-4. Push to main — auto-discovered on next build
-5. Run `./scripts/validate-workflow.sh` to verify discovery works locally
+3. Optionally add a `VERSION` file (e.g. `1.0.0`) to publish an immutable version tag and SLSA provenance
+4. Add a docker entry for the new directory to `.github/dependabot.yml`
+5. Push to main — auto-discovered on next build
+6. Run `./scripts/validate-workflow.sh` to verify discovery works locally
 
 ## Conventions
 

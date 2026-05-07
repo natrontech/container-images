@@ -1,0 +1,17 @@
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: podinfo-vs-protected
+  namespace: coraza-demo
+  # No server-snippets override needed — global server-snippets already enables WAF.
+spec:
+  host: coraza-vs-protected.local
+  ingressClassName: nginx-ingress
+  upstreams:
+  - name: podinfo
+    service: podinfo
+    port: 9898
+  routes:
+  - path: /
+    action:
+      pass: podinfo

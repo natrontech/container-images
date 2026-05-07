@@ -1,0 +1,39 @@
+controller:
+  image:
+    repository: ghcr.io/natrontech/container-images/nginx-ingress-coraza
+    tag: "5.4.1"
+    pullPolicy: IfNotPresent
+
+  ingressClass:
+    name: nginx-ingress
+
+  # Enables nginx.org/location-snippets and nginx.org/server-snippets annotations
+  # on Ingress resources, and location-snippets on VirtualServer routes.
+  enableSnippets: true
+
+  config:
+    entries:
+      # load_module must be in main{} context — the only valid placement
+      main-snippets: "load_module /usr/lib/nginx/modules/ngx_http_coraza_module.so;"
+      # Load Coraza rules once globally in the http{} context
+      http-snippets: |
+        coraza_rules_file /etc/coraza/coraza.conf;
+        coraza_rules_file /etc/coraza/coraza-crs-include.conf;
+      # Enable WAF in every server{} block by default
+      server-snippets: "coraza on;"
+
+  # Mount coraza.conf from a ConfigMap so it can be changed without rebuilding the image.
+  # The ConfigMap is defined in manifests/coraza-config.yaml.
+  # The mount shadows the baked-in /etc/coraza/coraza.conf with the ConfigMap value.
+  volumes:
+    - name: coraza-config
+      configMap:
+        name: coraza-config
+  volumeMounts:
+    - name: coraza-config
+      mountPath: /etc/coraza/coraza.conf
+      subPath: coraza.conf
+      readOnly: true
+
+prometheus:
+  create: false

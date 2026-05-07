@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: podinfo-protected
+  namespace: coraza-demo
+  # No coraza annotation needed — server-snippets already enables WAF globally.
+spec:
+  ingressClassName: nginx-ingress
+  rules:
+  - host: coraza-protected.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: podinfo
+            port:
+              number: 9898

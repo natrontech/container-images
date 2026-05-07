@@ -2,27 +2,29 @@ name: Container Cleanup
 
 on:
   schedule:
-    - cron: '0 3 * * 0'
+    - cron: '0 3 * * 0'  # every Sunday at 03:00 UTC
   workflow_dispatch:
     inputs:
       max_age_days:
-        description: 'Maximum age in days for untagged versions to keep'
+        description: 'Minimum age in days before deleting untagged/orphaned versions'
         required: false
         default: '30'
         type: string
 
-permissions:
-  contents: read
-  packages: write
+permissions: {}
 
 jobs:
   discover-containers:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       containers: ${{ steps.discover.outputs.containers }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Discover containers
         id: discover
@@ -46,11 +48,18 @@ jobs:
     needs: discover-containers
     if: needs.discover-containers.outputs.containers != '[]'
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     env:
       MAX_AGE_DAYS: ${{ github.event.inputs.max_age_days || '30' }}
     steps:
-      - name: Delete old untagged container versions
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Delete old untagged versions and orphaned attestation blobs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const containers = ${{ needs.discover-containers.outputs.containers }};
@@ -58,11 +67,21 @@ jobs:
             const cutoffDate = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
             const org = context.repo.owner;
 
-            core.info(`Cleaning up versions older than ${maxAgeDays} days (before ${cutoffDate.toISOString()})`);
+            // Fixed tags that must never be deleted: sha-<hex> or semver-like (e.g. 5.4.1)
+            const FIXED_TAG_RE = /^(sha-[a-f0-9]+|[0-9]+\.[0-9]+.*)$/;
+
+            // Cosign attestation/signature blobs (old bundle format):
+            //   sha256-<64-hex>.att  — SBOM / provenance attestation
+            //   sha256-<64-hex>.sig  — image signature
+            // OCI referrer tag schema fallback:
+            //   sha256-<64-hex>      — referrer without extension
+            const ATTESTATION_TAG_RE = /^sha256-[a-f0-9]{64}(\.(att|sig))?$/;
+
+            core.info(`Cutoff date: ${cutoffDate.toISOString()} (${maxAgeDays} days)`);
 
             for (const container of containers) {
               const packageName = `container-images/${container}`;
-              core.info(`\nProcessing package: ${packageName}`);
+              core.info(`\nProcessing: ${packageName}`);
 
               let versions;
               try {
@@ -75,38 +94,72 @@ jobs:
                 continue;
               }
 
-              const protectedTags = ['latest', 'nightly'];
+              // Collect the digests of every version that carries a fixed tag.
+              // These are the parent images we must never orphan.
+              // version.name is the image digest (sha256:...)
+              const keepDigests = new Set(
+                versions
+                  .filter(v => (v.metadata?.container?.tags ?? []).some(t => FIXED_TAG_RE.test(t)))
+                  .map(v => v.name)
+              );
+
+              core.info(`  Protected digests (fixed tags): ${keepDigests.size}`);
+
               let deleted = 0;
 
               for (const version of versions) {
-                const tags = version.metadata?.container?.tags || [];
+                const tags = version.metadata?.container?.tags ?? [];
                 const updatedAt = new Date(version.updated_at);
+                const ageDays = Math.floor((Date.now() - updatedAt) / 86_400_000);
 
-                // Skip versions with protected tags
-                if (tags.some(t => protectedTags.includes(t))) continue;
+                // Never touch versions that carry a fixed tag (sha-*, semver)
+                if (tags.some(t => FIXED_TAG_RE.test(t))) continue;
 
-                // Delete untagged versions older than cutoff
+                // Orphaned attestation / signature blobs (old cosign bundle format).
+                // Delete when: parent digest is not in the keep set AND old enough.
+                const attTag = tags.find(t => ATTESTATION_TAG_RE.test(t));
+                if (attTag) {
+                  const parentDigest = 'sha256:' + attTag
+                    .replace(/^sha256-/, '')
+                    .replace(/\.(att|sig)$/, '');
+                  if (!keepDigests.has(parentDigest) && updatedAt < cutoffDate) {
+                    core.info(`  Deleting orphaned blob ${version.id} tag=${attTag} age=${ageDays}d`);
+                    try {
+                      await github.rest.packages.deletePackageVersionForOrg({
+                        package_type: 'container', package_name: packageName,
+                        org, package_version_id: version.id,
+                      });
+                      deleted++;
+                    } catch (err) {
+                      core.warning(`  Failed to delete ${version.id}: ${err.message}`);
+                    }
+                  }
+                  continue;
+                }
+
+                // Untagged versions: old latest/nightly images whose mutable tags
+                // have moved to a newer build. Delete when old enough.
                 if (tags.length === 0 && updatedAt < cutoffDate) {
-                  core.info(`  Deleting untagged version ${version.id} (updated ${updatedAt.toISOString()})`);
+                  core.info(`  Deleting untagged version ${version.id} age=${ageDays}d`);
                   try {
                     await github.rest.packages.deletePackageVersionForOrg({
-                      package_type: 'container', package_name: packageName, org,
-                      package_version_id: version.id,
+                      package_type: 'container', package_name: packageName,
+                      org, package_version_id: version.id,
                     });
                     deleted++;
                   } catch (err) {
-                    core.warning(`  Failed to delete version ${version.id}: ${err.message}`);
+                    core.warning(`  Failed to delete ${version.id}: ${err.message}`);
                   }
                 }
               }
 
-              core.info(`  Deleted ${deleted} old untagged version(s) for ${packageName}`);
+              core.info(`  Deleted ${deleted} version(s) for ${packageName}`);
             }
 
       - name: Summary
         run: |
-          echo "## 🧹 Container Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Container Cleanup Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Cleaned up untagged container versions older than **$MAX_AGE_DAYS days**." >> $GITHUB_STEP_SUMMARY
+          echo "Deleted untagged versions and orphaned attestation blobs older than **${MAX_AGE_DAYS} days**." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Protected tags (never deleted): \`latest\`, \`nightly\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Never deleted:** versions tagged with \`sha-*\` or a version number (e.g. \`5.4.1\`) and their attestations." >> $GITHUB_STEP_SUMMARY
