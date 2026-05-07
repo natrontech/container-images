@@ -3,9 +3,16 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
     commit-message:
       prefix: ":seedling:"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    open-pull-requests-limit: 10
     groups:
       github-actions:
         patterns:
@@ -14,9 +21,34 @@ updates:
   - package-ecosystem: "docker"
     directory: "/tcp-forwarder"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
     commit-message:
       prefix: ":robot:"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 5
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/nginx-ingress-coraza"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
+    commit-message:
+      prefix: ":robot:"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 5
     groups:
       docker-dependencies:
         patterns:

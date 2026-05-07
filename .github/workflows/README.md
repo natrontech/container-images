@@ -1,93 +1,59 @@
 # GitHub Actions Workflows
 
-This directory contains the automated workflows for building, publishing, and maintaining container images.
+## container-build.yml
 
-## Workflows
+Builds and publishes all container images.
 
-### 🏗️ container-build.yml
-**Purpose:** Main workflow for building and publishing container images
+**Triggers:** push to `main`, nightly at 02:00 UTC, manual dispatch (optional container filter)
 
-**Triggers:**
-- **Schedule:** Every night at 02:00 UTC
-- **Push:** When changes are pushed to main branch
-- **Manual:** Can be triggered manually with optional container selection
+**Pipeline:**
 
-**Features:**
-- 🔍 **Auto-discovery:** Automatically finds all directories with Dockerfiles
-- 🏗️ **Matrix builds:** Builds multiple containers in parallel
-- 🏷️ **Smart tagging:** 
-  - `:nightly` for scheduled builds
-  - `:sha-XXXXXXX` for all builds
-  - `:latest` for main branch pushes
-- 🔒 **Security:** Cosign signing, SLSA provenance, SBOM generation
-- 🌐 **Multi-arch:** Builds for linux/amd64 and linux/arm64
-- ✅ **Verification:** Validates signatures and attestations
-
-### 🧹 cleanup.yml
-**Purpose:** Keeps the container registry clean by removing old images
-
-**Triggers:**
-- **Schedule:** Every Sunday at 03:00 UTC
-- **Manual:** Can be triggered with custom retention settings
-
-**Features:**
-- Removes old container versions (keeps minimum 10)
-- Cleans up untagged images
-- Configurable retention period
-
-### 📊 scorecard.yml
-**Purpose:** Security scorecard analysis for supply chain security
-
-**Triggers:**
-- **Schedule:** Every Monday at 14:00 UTC
-- **Push:** On main branch changes
-- **Branch protection:** When branch protection rules change
-
-## Container Discovery
-
-The build system automatically discovers containers by:
-1. Scanning the repository root for directories
-2. Checking if each directory contains a `Dockerfile`
-3. Using the directory name as the container image name
-
-Example structure:
 ```
-my-tool/
-├── Dockerfile      ← Required
-├── entrypoint.sh   ← Optional
-└── healthcheck.sh  ← Optional
+discover-containers
+  └── build-and-push (matrix: all containers)
+        ├── collect-digests (versioned containers, non-nightly)
+        │     └── provenance (SLSA L3, versioned containers, non-nightly)
+        ├── verify (all containers, non-nightly)
+        └── summary
 ```
 
-Results in: `ghcr.io/natrontech/container-images/my-tool:nightly`
+**Tags published:**
 
-## Manual Workflow Dispatch
+| Tag             | When                                               | Mutable |
+| --------------- | -------------------------------------------------- | ------- |
+| `:nightly`      | nightly schedule only                              | yes     |
+| `:latest`       | every push to main + nightly                       | yes     |
+| `:sha-<commit>` | every push to main                                 | no      |
+| `:<version>`    | push to main, for containers with a `VERSION` file | no      |
 
-### Build Specific Containers
-To build only specific containers manually:
-1. Go to **Actions** → **Container Build & Publish**
-2. Click **Run workflow**
-3. Enter comma-separated container names (e.g., `tcp-forwarder,my-tool`)
-4. Leave empty to build all containers
+**Security:**
+- Every image is signed with Cosign (keyless/OIDC, `--new-bundle-format`)
+- Every image gets a CycloneDX SBOM attestation
+- Versioned images (with a `VERSION` file) additionally get SLSA Level 3 provenance
+- Signature, SBOM, and provenance are verified in the `verify` job before the pipeline completes
 
-### Cleanup with Custom Settings
-To run cleanup with custom retention:
-1. Go to **Actions** → **Container Cleanup**
-2. Click **Run workflow**
-3. Set maximum age in days
+**Multi-arch:** `linux/amd64` and `linux/arm64`
 
-## Security Features
+---
 
-All container images include:
-- 🔏 **Cosign signatures** for image authenticity
-- 📜 **SLSA Level 3 provenance** for build integrity
-- 📋 **CycloneDX SBOM** for dependency tracking
-- 🛡️ **Multi-stage verification** ensuring security
+## cleanup.yml
 
-## Adding New Containers
+Removes old untagged image versions and orphaned attestation blobs from GHCR.
 
-1. Create a new directory: `mkdir my-new-tool`
-2. Add a Dockerfile: `touch my-new-tool/Dockerfile`
-3. Commit and push to main branch
-4. The container will be automatically built on the next workflow run
+**Triggers:** every Sunday at 03:00 UTC, manual dispatch (configurable `max_age_days`, default 30)
 
-No configuration changes needed - everything is automatic!
+**What gets deleted (after `max_age_days`):**
+- Untagged versions — old `:latest`/`:nightly` images whose mutable tags moved to a newer build
+- Orphaned cosign attestation/signature blobs (`sha256-<hex>.att`, `sha256-<hex>.sig`) whose parent image digest no longer exists
+
+**What is never deleted:**
+- Any version carrying a `sha-*` or semver tag (e.g. `sha-abc1234`, `5.4.1`)
+- Attestations and signatures for those protected versions
+
+---
+
+## scorecard.yml
+
+Runs [OpenSSF Scorecard](https://github.com/ossf/scorecard) supply-chain security analysis and publishes results to the OSSF dashboard.
+
+**Triggers:** push to `main`, every Monday at 14:00 UTC, branch protection rule changes

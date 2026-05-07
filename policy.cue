@@ -12,7 +12,7 @@ predicate: {
       entryPoint: ".github/workflows/container-build.yml"
 
       // This condition verifies that the image was generated from the source repository we expect.
-      uri: =~"^git\\+https://github.com/natrontech/container-images@refs/.*$"
+      uri: =~"^git\\+https://github.com/natrontech/container-images@refs/heads/main$"
     }
   }
 }

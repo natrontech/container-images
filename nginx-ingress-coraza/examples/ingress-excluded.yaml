@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: podinfo-excluded
+  namespace: coraza-demo
+  annotations:
+    # Disable WAF for all locations on this virtual host.
+    # Requires -enable-snippets on the NIC controller.
+    # Fallback: if location-level override is insufficient, use server-snippets instead:
+    #   nginx.org/server-snippets: "coraza_enable off;"
+    nginx.org/location-snippets: |
+      coraza off;
+spec:
+  ingressClassName: nginx-ingress
+  rules:
+  - host: coraza-excluded.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: podinfo
+            port:
+              number: 9898

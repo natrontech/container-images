@@ -88,7 +88,7 @@ for container in "${containers[@]}"; do
         echo "  ✅ ${container} in dependabot.yml"
     else
         echo "  ❌ ${container} missing from dependabot.yml"
-        echo "     Run: bash .github/scripts/update-dependabot.sh"
+        echo "     Manually add a docker entry for /${container} to .github/dependabot.yml"
         dependabot_ok=false
     fi
 done
