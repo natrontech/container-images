@@ -104,8 +104,8 @@ jobs:
             echo "$matrix"
           }
 
-          read -r json_array matrix < <(build_json_array containers)
-          read -r versioned_json_array versioned_matrix < <(build_json_array versioned_containers)
+          { read -r json_array; read -r matrix; } < <(build_json_array containers)
+          { read -r versioned_json_array; read -r versioned_matrix; } < <(build_json_array versioned_containers)
 
           echo "containers=${json_array}" >> "$GITHUB_OUTPUT"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
