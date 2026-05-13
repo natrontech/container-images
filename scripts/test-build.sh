@@ -33,33 +33,50 @@ if [[ ! -f "${CONTAINER_NAME}/Dockerfile" ]]; then
     exit 1
 fi
 
+PLATFORMS="linux/amd64,linux/arm64"
+if [[ -f "${CONTAINER_NAME}/PLATFORMS" ]]; then
+    PLATFORMS=$(cat "${CONTAINER_NAME}/PLATFORMS" | tr -d '[:space:]')
+fi
+
+VERSION=""
+if [[ -f "${CONTAINER_NAME}/VERSION" ]]; then
+    VERSION=$(cat "${CONTAINER_NAME}/VERSION" | tr -d '[:space:]')
+fi
+
+VERSION_TAGS=()
+if [[ -n "$VERSION" ]]; then
+    VERSION_TAGS=(-t "${IMAGE_NAME}:${VERSION}")
+fi
+
 echo "🏗️  Building container: $CONTAINER_NAME"
 echo "📁 Context: ./$CONTAINER_NAME"
 echo "🏷️  Image: $IMAGE_NAME"
 echo "🔖 SHA: $SHORT_SHA"
+echo "🖥️  Platforms: $PLATFORMS"
+[[ -n "$VERSION" ]] && echo "📌 Version: $VERSION"
 echo ""
 
-if docker buildx inspect multiarch-builder >/dev/null 2>&1; then
-    echo "🔧 Using existing buildx builder: multiarch-builder"
-else
-    docker buildx create --name multiarch-builder --use >/dev/null 2>&1 || true
-fi
+PLATFORM_COUNT=$(echo "${PLATFORMS}" | tr ',' '\n' | wc -l | tr -d '[:space:]')
 
-docker buildx build \
-    --platform linux/amd64,linux/arm64 \
-    -t "${IMAGE_NAME}:latest" \
-    -t "${IMAGE_NAME}:sha-${SHORT_SHA}" \
-    -t "${IMAGE_NAME}:test" \
-    --load \
-    "./${CONTAINER_NAME}" 2>/dev/null || {
-    echo "⚠️  Multi-arch --load not supported, building for current platform only"
+if [[ "${PLATFORM_COUNT}" -gt 1 ]]; then
+    echo "⚠️  Multi-platform build (${PLATFORMS}) — --load requires a single platform, building for current platform only"
     docker buildx build \
         -t "${IMAGE_NAME}:latest" \
         -t "${IMAGE_NAME}:sha-${SHORT_SHA}" \
         -t "${IMAGE_NAME}:test" \
+        "${VERSION_TAGS[@]}" \
         --load \
         "./${CONTAINER_NAME}"
-}
+else
+    docker buildx build \
+        --platform "${PLATFORMS}" \
+        -t "${IMAGE_NAME}:latest" \
+        -t "${IMAGE_NAME}:sha-${SHORT_SHA}" \
+        -t "${IMAGE_NAME}:test" \
+        "${VERSION_TAGS[@]}" \
+        --load \
+        "./${CONTAINER_NAME}"
+fi
 
 echo "✅ Build completed successfully!"
 echo ""
@@ -67,7 +84,11 @@ echo "🧪 Testing container..."
 
 if command -v dive >/dev/null 2>&1; then
     echo "📊 Running dive analysis..."
-    dive "${IMAGE_NAME}:test" --ci
+    DIVE_ARGS=(--ci)
+    if [[ -f "${CONTAINER_NAME}/.dive-ci.yaml" ]]; then
+        DIVE_ARGS+=(--ci-config "${CONTAINER_NAME}/.dive-ci.yaml")
+    fi
+    dive "${IMAGE_NAME}:test" "${DIVE_ARGS[@]}"
 else
     echo "💡 Install 'dive' for container analysis: brew install dive"
 fi
@@ -80,6 +101,7 @@ if [[ "$PUSH_FLAG" == "--push" ]]; then
     echo "🚀 Pushing to registry..."
     docker push "${IMAGE_NAME}:latest"
     docker push "${IMAGE_NAME}:sha-${SHORT_SHA}"
+    [[ -n "$VERSION" ]] && docker push "${IMAGE_NAME}:${VERSION}"
     echo "✅ Push completed!"
 fi
 

@@ -8,16 +8,17 @@
 
 The image adds three components on top of the official NIC image:
 
-1. **`ngx_http_coraza_module.so`** — compiled against the exact NGINX ABI from the NIC image
-2. **`libcoraza.so`** — the Go-based Coraza engine, loaded at runtime via dlopen
-3. **OWASP CRS rules** — baked into `/etc/coraza/crs/`
+1. **`ngx_http_coraza_module.so`** — compiled against the exact NGINX ABI from the NIC image (Stage 2 reads `nginx -v` at build time and downloads the matching NGINX source to compile against)
+2. **`libcoraza.so`** — the Go-based Coraza engine, compiled as a C shared library and loaded at runtime via `dlopen`
+3. **OWASP CRS rules** — baked into `/etc/coraza/crs/`, GPG-verified at build time
 
 WAF is wired in through NIC's snippet mechanism:
 
 ```
-main context:   load_module ngx_http_coraza_module.so    ← main-snippets
-http context:   coraza_rules_file (engine + CRS)         ← http-snippets
-server context: coraza on                                ← server-snippets
+main context:   load_module modules/ngx_http_coraza_module.so                   ← main-snippets
+http context:   coraza_rules_file /etc/coraza/coraza.conf                       ← http-snippets
+                coraza_rules_file /etc/coraza/coraza-crs-include.conf
+server context: coraza on                                                       ← server-snippets
 ```
 
 Every Ingress/VirtualServer inherits the WAF by default and can opt out or tune rules per-resource via annotations.
@@ -83,12 +84,18 @@ See [examples/](examples/) for complete manifests covering all cases.
 **Getting digests:**
 
 ```bash
-# Base images (golang, nginx-ingress, alpine)
-docker manifest inspect nginx/nginx-ingress:<VERSION> \
-  | jq -r '.manifests[] | select(.platform.os=="linux" and .platform.architecture=="amd64") | .digest'
+# Multi-platform manifest digest (what the Dockerfile ARG expects)
+docker buildx imagetools inspect golang:1.26-bookworm \
+  --format '{{json .Manifest}}' | jq -r '.digest'
 
-# libcoraza — no release artifacts, SHA256 is self-computed
-curl -fsSL "https://github.com/corazawaf/libcoraza/tarball/<VERSION>" | sha256sum
+docker buildx imagetools inspect nginx/nginx-ingress:5.4.2 \
+  --format '{{json .Manifest}}' | jq -r '.digest'
+
+docker buildx imagetools inspect alpine:3.23 \
+  --format '{{json .Manifest}}' | jq -r '.digest'
+
+# libcoraza SHA256 — computed from the tarball (no signed release artifact)
+curl -fsSL "https://github.com/corazawaf/libcoraza/tarball/v1.6.0" | sha256sum
 ```
 
 > When bumping `NIC_VERSION`, also check the [coraza-nginx changelog](https://github.com/corazawaf/coraza-nginx/releases) for a newer `CORAZA_NGINX_VERSION` — newer NGINX versions occasionally change internal C APIs the module hooks into, causing a compile error. The ABI recompilation itself is automatic: Stage 2 reads `nginx -v` at build time and compiles the module against the matching NGINX source.

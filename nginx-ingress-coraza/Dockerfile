@@ -1,13 +1,14 @@
+# syntax=docker/dockerfile:1
 # Global build args — declared before any FROM so they are available in all FROM instructions.
 # To use a value inside a stage's RUN commands, redeclare with ARG <name> (inherits global default).
 ARG GO_VERSION=1.26
-ARG GO_DIGEST=sha256:6b9b1ff26b22fde9b31abc5c6994586f588107ee3aa54dba50626aaac5884995
-ARG NIC_VERSION=5.4.1
-ARG NIC_DIGEST=sha256:5fabb45022a8875d428382222859f27df2845cc22e6780fd3476fbbcf5bad504
+ARG GO_DIGEST=sha256:252599aeb51ad60b83e4d8821802068127c528c707cb7dd7afd93be057c6011c
+ARG NIC_VERSION=5.4.2
+ARG NIC_DIGEST=sha256:f79a22983a4ec713bde65fa2510d1ea2322c5a899ac5fbeacd05dd1ad250be05
 ARG ALPINE_VERSION=3.23
-ARG ALPINE_DIGEST=sha256:4d889c14e7d5a73929ab00be2ef8ff22437e7cbc545931e52554a7b00e123d8b
-ARG LIBCORAZA_VERSION=v1.4.0
-ARG LIBCORAZA_SHA256=356d7ddb2c816ffb1a4ab46dca2de881b21cafe57ea33e5cf20fb772ae4c5147
+ARG ALPINE_DIGEST=sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+ARG LIBCORAZA_VERSION=v1.6.0
+ARG LIBCORAZA_SHA256=27158bfe16314e46fc4c276c2cb3e04519ed548337fc961155636768fb44be4a
 ARG CORAZA_NGINX_VERSION=v0.11.0
 ARG CRS_VERSION=v4.26.0
 
@@ -17,6 +18,8 @@ ARG CRS_VERSION=v4.26.0
 # This stage compiles libcoraza.so + libcoraza.a + coraza/coraza.h.
 # ──────────────────────────────────────────────────────────────────────────────
 FROM golang:${GO_VERSION}-bookworm@${GO_DIGEST} AS libcoraza-builder
+
+SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     autoconf \
@@ -29,24 +32,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ARG LIBCORAZA_VERSION
 ARG LIBCORAZA_SHA256
-RUN set -eux; \
-    wget -q "https://github.com/corazawaf/libcoraza/tarball/${LIBCORAZA_VERSION}" -O /tmp/libcoraza.tar.gz; \
-    echo "${LIBCORAZA_SHA256}  /tmp/libcoraza.tar.gz" | sha256sum -c -; \
-    tar -xf /tmp/libcoraza.tar.gz -C /tmp/; \
-    cd /tmp/*-libcoraza-*; \
-    ./build.sh; \
-    ./configure; \
-    make; \
-    mkdir -p /output/lib /output/include/coraza; \
-    cp libcoraza.a /output/lib/; \
-    cp libcoraza.so /output/lib/; \
-    cp coraza/coraza.h /output/include/coraza/
+RUN wget "https://github.com/corazawaf/libcoraza/tarball/${LIBCORAZA_VERSION}" -O /tmp/libcoraza.tar.gz \
+    && echo "${LIBCORAZA_SHA256}  /tmp/libcoraza.tar.gz" | sha256sum -c - \
+    && tar -xf /tmp/libcoraza.tar.gz -C /tmp/ \
+    && cd /tmp/*-libcoraza-* \
+    && ./build.sh \
+    && ./configure \
+    && make \
+    && mkdir -p /output/lib /output/include/coraza \
+    && cp libcoraza.a /output/lib/ \
+    && cp libcoraza.so /output/lib/ \
+    && cp coraza/coraza.h /output/include/coraza/ \
+    && test -s /output/lib/libcoraza.a \
+    && test -s /output/lib/libcoraza.so \
+    && test -s /output/include/coraza/coraza.h
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 2: Build ngx_http_coraza_module.so
 # Uses the NIC image as builder base to guarantee exact NGINX ABI match.
 # ──────────────────────────────────────────────────────────────────────────────
 FROM nginx/nginx-ingress:${NIC_VERSION}@${NIC_DIGEST} AS nginx-module-builder
+
+SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
 USER root
 
@@ -66,54 +73,69 @@ COPY --from=libcoraza-builder /output/lib/libcoraza.so /usr/local/lib/
 COPY --from=libcoraza-builder /output/include/coraza /usr/local/include/coraza
 RUN ldconfig
 
-# Capture the exact NGINX version and configure arguments from the running binary
-RUN nginx -v 2>&1 | grep -oP '(?<=nginx/)[0-9.]+' > /tmp/nginx_version.txt
-RUN nginx -V 2>&1 | sed -n 's/^.*arguments: //p' > /tmp/nginx_configure_args.txt
+# Capture the exact NGINX version and configure arguments from the running binary.
+# test -s ensures the captured values are non-empty — an empty file means the
+# parse failed silently and would produce a broken build further down.
+RUN nginx -v 2>&1 | grep -oP '(?<=nginx/)[0-9.]+' > /tmp/nginx_version.txt \
+    && test -s /tmp/nginx_version.txt
+RUN nginx -V 2>&1 | sed -n 's/^.*arguments: //p' > /tmp/nginx_configure_args.txt \
+    && test -s /tmp/nginx_configure_args.txt
 
 ARG CORAZA_NGINX_VERSION
 RUN git clone --depth 1 --branch ${CORAZA_NGINX_VERSION} \
     https://github.com/corazawaf/coraza-nginx.git /build/coraza-nginx
 
-# Import NGINX release signing keys and download source with GPG verification
+# Download NGINX release signing keys to files first, then import.
+# Avoids masking a curl failure in a pipe where only the last exit code is seen.
 # Keys: Konstantin Pavlov (thresh), Roman Arutyunyan (arut), Sergey Kandaurov (pluknet)
-RUN curl -fsSL \
-      https://nginx.org/keys/thresh.key \
-      https://nginx.org/keys/arut.key \
-      https://nginx.org/keys/pluknet.key \
-    | gpg --batch --import
-RUN NGINX_VERSION=$(cat /tmp/nginx_version.txt) && \
-    curl -fsSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" -o /tmp/nginx.tar.gz && \
-    curl -fsSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz.asc" -o /tmp/nginx.tar.gz.asc && \
-    gpg --batch --verify /tmp/nginx.tar.gz.asc /tmp/nginx.tar.gz && \
-    tar -xz -C /build/ -f /tmp/nginx.tar.gz && \
-    mv /build/nginx-${NGINX_VERSION} /build/nginx-src
+RUN curl -fsSL https://nginx.org/keys/thresh.key -o /tmp/thresh.key \
+    && curl -fsSL https://nginx.org/keys/arut.key -o /tmp/arut.key \
+    && curl -fsSL https://nginx.org/keys/pluknet.key -o /tmp/pluknet.key \
+    && gpg --batch --import /tmp/thresh.key /tmp/arut.key /tmp/pluknet.key \
+    && rm /tmp/thresh.key /tmp/arut.key /tmp/pluknet.key
+
+RUN NGINX_VERSION=$(cat /tmp/nginx_version.txt) \
+    && curl -fsSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" -o /tmp/nginx.tar.gz \
+    && curl -fsSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz.asc" -o /tmp/nginx.tar.gz.asc \
+    && gpg --batch --verify /tmp/nginx.tar.gz.asc /tmp/nginx.tar.gz \
+    && tar -xz -C /build/ -f /tmp/nginx.tar.gz \
+    && mv /build/nginx-${NGINX_VERSION} /build/nginx-src
 
 # Build the NGINX dynamic module using the exact configure args from the running binary.
 # CONFARGS is unquoted so the shell splits it into individual flags.
 WORKDIR /build/nginx-src
-RUN CONFARGS=$(cat /tmp/nginx_configure_args.txt) && \
-    eval "./configure --with-compat --add-dynamic-module=/build/coraza-nginx ${CONFARGS}" && \
-    make modules && \
-    cp objs/ngx_http_coraza_module.so /tmp/ngx_http_coraza_module.so
+RUN CONFARGS=$(cat /tmp/nginx_configure_args.txt) \
+    && eval "./configure --with-compat --add-dynamic-module=/build/coraza-nginx ${CONFARGS}" \
+    && make modules \
+    && cp objs/ngx_http_coraza_module.so /tmp/ngx_http_coraza_module.so \
+    && test -s /tmp/ngx_http_coraza_module.so
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 3: Fetch OWASP Core Rule Set
 # ──────────────────────────────────────────────────────────────────────────────
 FROM alpine:${ALPINE_VERSION}@${ALPINE_DIGEST} AS crs-downloader
 
+SHELL ["/bin/sh", "-eux", "-c"]
+
 ARG CRS_VERSION
 # Import CRS GPG key from coreruleset.org; key fingerprint: 3600 6F0E 0BA1 6783 2158 8211 38EE ACA1 AB8A 6E72
-# Use the signed minimal release asset instead of the unsigned auto-generated GitHub archive.
-RUN apk add --no-cache curl tar gnupg && \
-    curl -fsSL https://coreruleset.org/security.asc | gpg --batch --import && \
-    CRS_BARE="${CRS_VERSION#v}" && \
-    curl -fsSL "https://github.com/coreruleset/coreruleset/releases/download/${CRS_VERSION}/coreruleset-${CRS_BARE}-minimal.tar.gz" \
-      -o /tmp/crs.tar.gz && \
-    curl -fsSL "https://github.com/coreruleset/coreruleset/releases/download/${CRS_VERSION}/coreruleset-${CRS_BARE}-minimal.tar.gz.asc" \
-      -o /tmp/crs.tar.gz.asc && \
-    gpg --batch --verify /tmp/crs.tar.gz.asc /tmp/crs.tar.gz && \
-    mkdir -p /crs && \
-    tar -xz --strip-components=1 -C /crs -f /tmp/crs.tar.gz
+# Download key to file first to avoid masking curl failures in a pipe.
+RUN apk add --no-cache curl tar gnupg \
+    && curl -fsSL https://coreruleset.org/security.asc -o /tmp/crs-signing.asc \
+    && test -s /tmp/crs-signing.asc \
+    && gpg --batch --import /tmp/crs-signing.asc \
+    && CRS_BARE="${CRS_VERSION#v}" \
+    && curl -fsSL "https://github.com/coreruleset/coreruleset/releases/download/${CRS_VERSION}/coreruleset-${CRS_BARE}-minimal.tar.gz" \
+      -o /tmp/crs.tar.gz \
+    && curl -fsSL "https://github.com/coreruleset/coreruleset/releases/download/${CRS_VERSION}/coreruleset-${CRS_BARE}-minimal.tar.gz.asc" \
+      -o /tmp/crs.tar.gz.asc \
+    && test -s /tmp/crs.tar.gz \
+    && test -s /tmp/crs.tar.gz.asc \
+    && gpg --batch --verify /tmp/crs.tar.gz.asc /tmp/crs.tar.gz \
+    && mkdir -p /crs \
+    && tar -xz --strip-components=1 -C /crs -f /tmp/crs.tar.gz \
+    && test -d /crs/rules \
+    && ls /crs/rules/*.conf > /dev/null
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 4: Final image — NIC + Coraza module + libcoraza + OWASP CRS
@@ -122,26 +144,23 @@ FROM nginx/nginx-ingress:${NIC_VERSION}@${NIC_DIGEST}
 
 USER root
 
-# Coraza dynamic module
-COPY --from=nginx-module-builder /tmp/ngx_http_coraza_module.so \
+# Coraza dynamic module — ownership and mode set at copy time to avoid a separate chown layer
+COPY --chown=101:0 --chmod=755 --from=nginx-module-builder /tmp/ngx_http_coraza_module.so \
     /usr/lib/nginx/modules/ngx_http_coraza_module.so
 
-# libcoraza shared library — loaded at runtime by the module via dlopen
+# libcoraza shared library — loaded at runtime by the module via dlopen.
+# -X updates the cache only; skipping symlink recreation avoids duplicating every
+# system .so symlink (libcrypto, libssl, …) in this layer.
 COPY --from=libcoraza-builder /output/lib/libcoraza.so /usr/local/lib/libcoraza.so
-RUN ldconfig
+RUN ldconfig -X
 
-# OWASP CRS rules
+# OWASP CRS rules — ownership set at copy time
 RUN mkdir -p /etc/coraza/crs
-COPY --from=crs-downloader /crs/rules/ /etc/coraza/crs/rules/
-COPY --from=crs-downloader /crs/crs-setup.conf.example /etc/coraza/crs/crs-setup.conf
+COPY --chown=101:0 --from=crs-downloader /crs/rules/ /etc/coraza/crs/rules/
+COPY --chown=101:0 --from=crs-downloader /crs/crs-setup.conf.example /etc/coraza/crs/crs-setup.conf
 
 # Coraza configuration files
-COPY coraza.conf /etc/coraza/coraza.conf
-COPY coraza-crs-include.conf /etc/coraza/coraza-crs-include.conf
-
-# NIC runs as uid 101 (nginx)
-RUN chown -R 101:0 /etc/coraza /usr/lib/nginx/modules/ngx_http_coraza_module.so && \
-    chmod -R g=u /etc/coraza && \
-    chmod 755 /usr/lib/nginx/modules/ngx_http_coraza_module.so
+COPY --chown=101:0 coraza.conf /etc/coraza/coraza.conf
+COPY --chown=101:0 coraza-crs-include.conf /etc/coraza/coraza-crs-include.conf
 
 USER 101
