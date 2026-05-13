@@ -1,7 +1,7 @@
 controller:
   image:
     repository: ghcr.io/natrontech/container-images/nginx-ingress-coraza
-    tag: "5.4.1"
+    tag: "5.4.2"
     pullPolicy: IfNotPresent
 
   ingressClass:
@@ -14,7 +14,7 @@ controller:
   config:
     entries:
       # load_module must be in main{} context — the only valid placement
-      main-snippets: "load_module /usr/lib/nginx/modules/ngx_http_coraza_module.so;"
+      main-snippets: "load_module modules/ngx_http_coraza_module.so;"
       # Load Coraza rules once globally in the http{} context
       http-snippets: |
         coraza_rules_file /etc/coraza/coraza.conf;

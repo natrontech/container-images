@@ -1,0 +1,7 @@
+rules:
+  lowestEfficiency: 0.9
+  highestWastedBytes: disabled
+  # The nginx/nginx-ingress base image has internal layer duplication (nginx
+  # binaries, libcrypto, libssl) that dive attributes to user waste. Threshold
+  # is relaxed to account for that unavoidable base-image overhead.
+  highestUserWastedPercent: 0.20
