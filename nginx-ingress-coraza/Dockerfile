@@ -2,9 +2,9 @@
 # Global build args — declared before any FROM so they are available in all FROM instructions.
 # To use a value inside a stage's RUN commands, redeclare with ARG <name> (inherits global default).
 ARG GO_VERSION=1.26
-ARG GO_DIGEST=sha256:252599aeb51ad60b83e4d8821802068127c528c707cb7dd7afd93be057c6011c
-ARG NIC_VERSION=5.4.2
-ARG NIC_DIGEST=sha256:f79a22983a4ec713bde65fa2510d1ea2322c5a899ac5fbeacd05dd1ad250be05
+ARG GO_DIGEST=sha256:386d475a660466863d9f8c766fec64d7fdad3edac2c6a05020c09534d71edb4b
+ARG NIC_VERSION=5.4.3
+ARG NIC_DIGEST=sha256:176cb45029b5e9b6d9f65a69e0102448ac1da02421ca551f89e521644394ded3
 ARG ALPINE_VERSION=3.23
 ARG ALPINE_DIGEST=sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 ARG LIBCORAZA_VERSION=v1.6.0

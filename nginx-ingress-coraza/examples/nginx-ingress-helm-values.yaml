@@ -1,7 +1,7 @@
 controller:
   image:
     repository: ghcr.io/natrontech/container-images/nginx-ingress-coraza
-    tag: "5.4.2"
+    tag: "5.4.3"
     pullPolicy: IfNotPresent
 
   ingressClass:
@@ -25,15 +25,58 @@ controller:
   # Mount coraza.conf from a ConfigMap so it can be changed without rebuilding the image.
   # The ConfigMap is defined in manifests/coraza-config.yaml.
   # The mount shadows the baked-in /etc/coraza/coraza.conf with the ConfigMap value.
+  #
+  # The nginx-tmp emptyDir is required when readOnlyRootFilesystem: true — NGINX writes
+  # temporary files to /tmp at runtime. Without this writable volume the pod will crash on startup.
   volumes:
-    - name: coraza-config
+    - name: nginx-tmp
+      emptyDir: {}
+    - name: custom-templates
       configMap:
         name: coraza-config
+    - name: coraza-config
+      configMap:
+        name: nginx-ingress-coraza-config
   volumeMounts:
+    - name: nginx-tmp
+      mountPath: /tmp
+    - name: custom-templates
+      mountPath: /nginx.ingress.tmpl
+      subPath: nginx.ingress.tmpl
+      readOnly: true
     - name: coraza-config
       mountPath: /etc/coraza/coraza.conf
       subPath: coraza.conf
       readOnly: true
+
+  # Hardened pod and container security context.
+  # readOnlyRootFilesystem: true requires the nginx-tmp emptyDir volume above.
+  podSecurityContext:
+    fsGroup: 101
+  securityContext:
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - NET_BIND_SERVICE
+    runAsUser: 101
+    runAsGroup: 101
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  initContainerSecurityContext:
+    capabilities:
+      drop:
+        - ALL
+    runAsUser: 101
+    runAsGroup: 101
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
 
 prometheus:
   create: false
