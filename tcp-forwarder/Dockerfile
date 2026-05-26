@@ -1,3 +1,4 @@
+# checkov:skip=CKV_DOCKER_3:socat requires root to bind to privileged ports 80/443
 FROM ubuntu:26.04
 
 # Install dependencies
