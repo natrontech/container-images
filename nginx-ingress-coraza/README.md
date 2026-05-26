@@ -41,6 +41,24 @@ The ConfigMap referenced by the volume must exist before the Helm install:
 kubectl apply -f examples/coraza-config.yaml
 ```
 
+### Running with `readOnlyRootFilesystem: true`
+
+NGINX writes temporary files (client body buffers, proxy cache, etc.) to `/tmp` at runtime. When `readOnlyRootFilesystem: true` is set on the container security context, this directory is not writable and the pod will enter **CrashLoopBackOff** immediately on startup.
+
+To fix this, mount an `emptyDir` volume at `/tmp`:
+
+```yaml
+# in controller.volumes
+- name: nginx-tmp
+  emptyDir: {}
+
+# in controller.volumeMounts
+- name: nginx-tmp
+  mountPath: /tmp
+```
+
+The example values file already includes this volume alongside the full hardened security context (`readOnlyRootFilesystem`, `runAsNonRoot`, dropped capabilities, seccomp profile). See [examples/nginx-ingress-helm-values.yaml](examples/nginx-ingress-helm-values.yaml).
+
 ### 2. Switch WAF mode
 
 `coraza.conf` defaults to `DetectionOnly` (log but don't block). To block:
@@ -88,7 +106,7 @@ See [examples/](examples/) for complete manifests covering all cases.
 docker buildx imagetools inspect golang:1.26-bookworm \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
-docker buildx imagetools inspect nginx/nginx-ingress:5.4.2 \
+docker buildx imagetools inspect nginx/nginx-ingress:5.4.3 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
 docker buildx imagetools inspect alpine:3.23 \
