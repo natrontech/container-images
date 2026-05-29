@@ -1,7 +1,7 @@
 controller:
   image:
     repository: ghcr.io/natrontech/container-images/nginx-ingress-coraza
-    tag: "5.4.3"
+    tag: "5.5.0"
     pullPolicy: IfNotPresent
 
   ingressClass:

@@ -106,7 +106,7 @@ See [examples/](examples/) for complete manifests covering all cases.
 docker buildx imagetools inspect golang:1.26-bookworm \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
-docker buildx imagetools inspect nginx/nginx-ingress:5.4.3 \
+docker buildx imagetools inspect nginx/nginx-ingress:5.5.0 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
 docker buildx imagetools inspect alpine:3.23 \
