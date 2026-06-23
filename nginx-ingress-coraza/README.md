@@ -106,10 +106,10 @@ See [examples/](examples/) for complete manifests covering all cases.
 docker buildx imagetools inspect golang:1.26-bookworm \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
-docker buildx imagetools inspect nginx/nginx-ingress:5.5.0 \
+docker buildx imagetools inspect nginx/nginx-ingress:5.5.1 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
-docker buildx imagetools inspect alpine:3.23 \
+docker buildx imagetools inspect alpine:3.24 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
 # libcoraza SHA256 — computed from the tarball (no signed release artifact)
