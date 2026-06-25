@@ -9,7 +9,15 @@ ARG ALPINE_VERSION=3.24
 ARG ALPINE_DIGEST=sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 ARG LIBCORAZA_VERSION=v1.6.0
 ARG LIBCORAZA_SHA256=27158bfe16314e46fc4c276c2cb3e04519ed548337fc961155636768fb44be4a
+# ── PRE-RELEASE: coraza-nginx built from PR #54, not the stable v0.11.2 release ──
+# https://github.com/corazawaf/coraza-nginx/pull/54
+# Fix: pass through "101 Switching Protocols" so WebSocket upgrades no longer hang
+# under `coraza on`. The PR head commit is pinned for a reproducible build.
+# To return to the stable release, restore the `git clone --branch` step in Stage 2
+# and drop the CORAZA_NGINX_PR / CORAZA_NGINX_COMMIT args.
 ARG CORAZA_NGINX_VERSION=v0.11.2
+ARG CORAZA_NGINX_PR=54
+ARG CORAZA_NGINX_COMMIT=3c5ce85dce9823a61d4f50b9ce187e4fc7f18677
 ARG CRS_VERSION=v4.27.0
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -81,9 +89,16 @@ RUN nginx -v 2>&1 | grep -oP '(?<=nginx/)[0-9.]+' > /tmp/nginx_version.txt \
 RUN nginx -V 2>&1 | sed -n 's/^.*arguments: //p' > /tmp/nginx_configure_args.txt \
     && test -s /tmp/nginx_configure_args.txt
 
-ARG CORAZA_NGINX_VERSION
-RUN git clone --depth 1 --branch ${CORAZA_NGINX_VERSION} \
-    https://github.com/corazawaf/coraza-nginx.git /build/coraza-nginx
+# PRE-RELEASE: shallow-fetch the coraza-nginx PR #54 head and pin to its commit.
+# Asserting the checked-out SHA guarantees we build exactly the reviewed change.
+ARG CORAZA_NGINX_PR
+ARG CORAZA_NGINX_COMMIT
+RUN mkdir -p /build/coraza-nginx \
+    && git -C /build/coraza-nginx init -q \
+    && git -C /build/coraza-nginx remote add origin https://github.com/corazawaf/coraza-nginx.git \
+    && git -C /build/coraza-nginx fetch --depth 1 origin "pull/${CORAZA_NGINX_PR}/head" \
+    && git -C /build/coraza-nginx checkout --detach FETCH_HEAD \
+    && test "$(git -C /build/coraza-nginx rev-parse HEAD)" = "${CORAZA_NGINX_COMMIT}"
 
 # Download NGINX release signing keys to files first, then import.
 # Avoids masking a curl failure in a pipe where only the last exit code is seen.

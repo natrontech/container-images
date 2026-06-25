@@ -308,8 +308,11 @@ jobs:
 
   verify:
     needs: [discover-containers, build-and-push, provenance]
-    # always() so this runs even when provenance was skipped (non-versioned containers)
-    if: always() && needs.discover-containers.outputs.containers != '[]' && github.event_name != 'schedule' && needs.build-and-push.result == 'success'
+    # always() so this runs even when provenance was skipped (non-versioned containers).
+    # Restricted to main: the cosign cert-identity policy below is pinned to
+    # refs/heads/main, so signatures from feature-branch (pre-release) builds would
+    # not match. Pre-release images are still signed/attested — just not verified here.
+    if: always() && needs.discover-containers.outputs.containers != '[]' && github.event_name != 'schedule' && needs.build-and-push.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read

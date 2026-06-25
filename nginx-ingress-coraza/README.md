@@ -4,6 +4,20 @@
 
 **Image**: `ghcr.io/natrontech/container-images/nginx-ingress-coraza`
 
+> [!WARNING]
+> **Pre-release branch.** This branch builds the Coraza module from
+> [coraza-nginx PR #54](https://github.com/corazawaf/coraza-nginx/pull/54)
+> (pinned commit `3c5ce85`) instead of the stable `v0.11.2` release, to test the
+> fix that passes through `101 Switching Protocols` so WebSocket upgrades no
+> longer hang under `coraza on`. It is published only as the immutable
+> pre-release tag `:5.5.1-pr54-websocket` (and `:sha-<commit>`); it does **not**
+> update `:latest`. Do not merge to `main` — revert the Coraza source to the
+> stable release once the upstream PR lands.
+>
+> ```bash
+> ghcr.io/natrontech/container-images/nginx-ingress-coraza:5.5.1-pr54-websocket
+> ```
+
 ## Architecture
 
 The image adds three components on top of the official NIC image:
@@ -88,7 +102,7 @@ See [examples/](examples/) for complete manifests covering all cases.
 | ------------------------ | -------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
 | NGINX Ingress Controller | `5.5.1`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
 | libcoraza                | `v1.6.0`       | `LIBCORAZA_VERSION` / `LIBCORAZA_SHA256` in Dockerfile      | [releases](https://github.com/corazawaf/libcoraza/releases)      |
-| coraza-nginx module      | `v0.11.2`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
+| coraza-nginx module      | `PR #54 @ 3c5ce85` (base `v0.11.2`) | `CORAZA_NGINX_PR` / `CORAZA_NGINX_COMMIT` in Dockerfile | [PR #54](https://github.com/corazawaf/coraza-nginx/pull/54)      |
 | OWASP CRS                | `v4.27.0`      | `CRS_VERSION` in Dockerfile                                 | [releases](https://github.com/coreruleset/coreruleset/releases)  |
 | Go (builder)             | `1.26`         | `GO_VERSION` / `GO_DIGEST` in Dockerfile                    | [releases](https://go.dev/doc/devel/release)                     |
 | Alpine (CRS stage)       | `3.24`         | `ALPINE_VERSION` / `ALPINE_DIGEST` in Dockerfile            | [releases](https://alpinelinux.org/releases/)                    |
