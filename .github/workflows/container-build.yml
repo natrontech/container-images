@@ -253,6 +253,23 @@ jobs:
           path: ./outputs/${{ matrix.container }}-digest.txt
           retention-days: 1
 
+      # Record the published version so the tag-release job can create a matching
+      # git tag. Only fires when a NEW immutable version was published on main —
+      # not on nightly, feature-branch dispatch, or a re-run of an existing version.
+      - name: Record published version
+        if: steps.version.outputs.version_changed == 'true' && github.event_name != 'schedule' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p ./release-tags
+          echo "${{ matrix.container }}-${{ steps.version.outputs.version }}" > "./release-tags/${{ matrix.container }}.txt"
+
+      - name: Upload release tag artifact
+        if: steps.version.outputs.version_changed == 'true' && github.event_name != 'schedule' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-tag-${{ matrix.container }}
+          path: ./release-tags/${{ matrix.container }}.txt
+          retention-days: 1
+
   # Aggregate per-container digests into a single JSON map so the provenance
   # matrix job can index into it: fromJson(digests)[matrix.container]
   collect-digests:
@@ -391,6 +408,54 @@ jobs:
             --policy policy.cue \
             $IMAGE@$DIGEST
           echo "Provenance verification successful"
+
+  # Create an immutable git tag (<container>-<version>) for each newly published
+  # versioned image. build-and-push uploads a release-tag-* artifact only when it
+  # published a new version on main, so this tags exactly those releases — nothing
+  # on nightly, feature-branch dispatch, or re-runs of an already-published version.
+  # Tag pushes do not match the `push: branches: [main]` trigger, so this never
+  # re-triggers the workflow.
+  tag-release:
+    needs: [discover-containers, build-and-push]
+    if: always() && needs.discover-containers.outputs.versioned_containers != '[]' && github.event_name != 'schedule' && github.ref == 'refs/heads/main' && needs.build-and-push.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release tag artifacts
+        continue-on-error: true # no artifacts when no version changed in this run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-tag-*
+          merge-multiple: true
+          path: ./release-tags/
+
+      - name: Create git tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(./release-tags/*.txt)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No new versions published in this run — nothing to tag."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            tag="$(tr -d '[:space:]' < "$f")"
+            [ -n "$tag" ] || continue
+            # Idempotent: never overwrite an existing tag (tags are immutable).
+            if gh api "repos/${REPO}/git/ref/tags/${tag}" >/dev/null 2>&1; then
+              echo "Tag ${tag} already exists — skipping"
+            else
+              gh api --method POST "repos/${REPO}/git/refs" \
+                -f ref="refs/tags/${tag}" \
+                -f sha="${SHA}"
+              echo "Created tag ${tag}"
+            fi
+          done
 
   summary:
     needs: [discover-containers, build-and-push]
