@@ -88,7 +88,7 @@ See [examples/](examples/) for complete manifests covering all cases.
 | ------------------------ | -------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
 | NGINX Ingress Controller | `5.5.1`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
 | libcoraza                | `v1.6.0`       | `LIBCORAZA_VERSION` / `LIBCORAZA_SHA256` in Dockerfile      | [releases](https://github.com/corazawaf/libcoraza/releases)      |
-| coraza-nginx module      | `v0.11.2`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
+| coraza-nginx module      | `v0.11.4`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
 | OWASP CRS                | `v4.27.0`      | `CRS_VERSION` in Dockerfile                                 | [releases](https://github.com/coreruleset/coreruleset/releases)  |
 | Go (builder)             | `1.26`         | `GO_VERSION` / `GO_DIGEST` in Dockerfile                    | [releases](https://go.dev/doc/devel/release)                     |
 | Alpine (CRS stage)       | `3.24`         | `ALPINE_VERSION` / `ALPINE_DIGEST` in Dockerfile            | [releases](https://alpinelinux.org/releases/)                    |
@@ -96,7 +96,9 @@ See [examples/](examples/) for complete manifests covering all cases.
 **Update procedure:**
 
 1. Update the relevant `ARG` values in [Dockerfile](Dockerfile) and the **Pinned version** column above
-2. If `NIC_VERSION` changed, also bump [VERSION](VERSION) to match — this publishes a new immutable version tag (e.g., `:5.5.0`) without overwriting the previous one
+2. Bump [VERSION](VERSION) so a new immutable version tag is published without overwriting the previous one:
+   - **NIC bump** → set `VERSION` to the new NIC version (e.g. `5.6.0`)
+   - **Component-only bump** (coraza-nginx, libcoraza, CRS, base-image digests — NIC unchanged) → append/increment a revision suffix on the current NIC version (e.g. `5.5.1` → `5.5.1-2`)
 3. Push to main — CI builds and publishes `:latest`, `:sha-<commit>`, and the version tag
 
 **Getting digests:**
