@@ -5,12 +5,51 @@ metadata:
   namespace: nginx-ingress
 data:
   coraza.conf: |
+    # OWASP Coraza WAF engine configuration.
+    # Directives and defaults follow the Coraza recommended config:
+    # https://github.com/corazawaf/coraza/blob/main/coraza.conf-recommended
+
     # Rule engine mode: DetectionOnly (log only) or On (block)
     SecRuleEngine DetectionOnly
     SecRequestBodyAccess On
     SecResponseBodyAccess Off
+    # Temp dir for request bodies that exceed the in-memory limit below
+    # (uses the writable nginx-tmp emptyDir mounted at /tmp,
+    # see nginx-ingress-helm-values.yaml).
+    SecDataDir /tmp/
     SecRequestBodyLimit 13107200
+    # Buffer request bodies up to this size in memory before spilling to SecDataDir.
+    SecRequestBodyInMemoryLimit 131072
+    # NOTE: SecRequestBodyNoFilesLimit is unsupported by Coraza and silently ignored;
+    # only SecRequestBodyLimit is enforced.
     SecRequestBodyNoFilesLimit 131072
+    # Reject request bodies larger than the limit above. NOTE: Coraza auto-downgrades this
+    # to ProcessPartial whenever SecRuleEngine is DetectionOnly, so it only rejects when On.
+    SecRequestBodyLimitAction Reject
+
+    # Select the request body processor by Content-Type. Coraza — like ModSecurity —
+    # does NOT auto-enable the JSON/XML parsers. Without these, an application/json
+    # body is parsed as urlencoded and the entire raw body (indentation newlines and
+    # all) lands in ARGS_NAMES, causing false positives such as rule 921150
+    # (HTTP Header Injection / CR-LF). Rule IDs match modsecurity.conf-recommended.
+    SecRule REQUEST_HEADERS:Content-Type "^(?:application(?:/soap\+|/)|text/)xml" \
+        "id:200000,phase:1,t:none,t:lowercase,pass,nolog,ctl:requestBodyProcessor=XML"
+    SecRule REQUEST_HEADERS:Content-Type "^application/json" \
+        "id:200001,phase:1,t:none,t:lowercase,pass,nolog,ctl:requestBodyProcessor=JSON"
+    SecRule REQUEST_HEADERS:Content-Type "^application/[a-z0-9.-]+[+]json" \
+        "id:200006,phase:1,t:none,t:lowercase,pass,nolog,ctl:requestBodyProcessor=JSON"
+    # Cap JSON nesting depth (pairs with the JSON parser above) to guard against
+    # deeply-nested-payload resource exhaustion.
+    SecRequestBodyJsonDepthLimit 1024
+
+    # Reject requests whose body failed to parse (e.g. malformed JSON) or whose multipart
+    # body fails strict validation. Matches modsecurity.conf-recommended rules 200002/200003.
+    # Like all deny rules these block only when SecRuleEngine is On; DetectionOnly logs only.
+    SecRule REQBODY_ERROR "!@eq 0" \
+        "id:200002,phase:2,t:none,log,deny,status:400,msg:'Failed to parse request body.',logdata:'%{reqbody_error_msg}',severity:2"
+    SecRule MULTIPART_STRICT_ERROR "!@eq 0" \
+        "id:200003,phase:2,t:none,log,deny,status:400,msg:'Multipart request body failed strict validation.'"
+
     SecDebugLogLevel 0
     SecAuditEngine RelevantOnly
     SecAuditLog /dev/stdout

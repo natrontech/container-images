@@ -45,6 +45,17 @@ pre-commit run --all-files
 6. Push to main — auto-discovered on next build
 7. Run `./scripts/validate-workflow.sh` to verify discovery works locally
 
+## Updating nginx-ingress-coraza
+
+When bumping any pinned component of `nginx-ingress-coraza` (NIC, coraza-nginx, libcoraza, CRS, base-image digests), always update all of:
+
+1. The `ARG` values in `nginx-ingress-coraza/Dockerfile`
+2. `nginx-ingress-coraza/VERSION` (NIC bump → new NIC version; component-only bump → revision suffix, e.g. `5.5.1-2`)
+3. `nginx-ingress-coraza/CHANGELOG.md` — add a row to the component version matrix **and** a release-notes section
+4. The pinned-versions table in `nginx-ingress-coraza/README.md`
+
+Per-image changelogs are linked from the root `CHANGELOG.md` — when adding a changelog to another image, link it there too.
+
 ## Conventions
 
 - **Commits:** Conventional Commits format with emoji prefixes (`:seedling:` for deps, `:robot:` for Docker)
