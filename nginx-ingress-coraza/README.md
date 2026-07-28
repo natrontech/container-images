@@ -88,9 +88,9 @@ See [examples/](examples/) for complete manifests covering all cases.
 
 | Component                | Pinned version | Where to update                                             | Release page                                                     |
 | ------------------------ | -------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
-| NGINX Ingress Controller | `5.5.3`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
+| NGINX Ingress Controller | `5.5.4`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
 | libcoraza                | `v1.6.0`       | `LIBCORAZA_VERSION` / `LIBCORAZA_SHA256` in Dockerfile      | [releases](https://github.com/corazawaf/libcoraza/releases)      |
-| coraza-nginx module      | `v0.11.4`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
+| coraza-nginx module      | `v0.20.0`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
 | OWASP CRS                | `v4.28.0`      | `CRS_VERSION` in Dockerfile                                 | [releases](https://github.com/coreruleset/coreruleset/releases)  |
 | Go (builder)             | `1.26`         | `GO_VERSION` / `GO_DIGEST` in Dockerfile                    | [releases](https://go.dev/doc/devel/release)                     |
 | Alpine (CRS stage)       | `3.24`         | `ALPINE_VERSION` / `ALPINE_DIGEST` in Dockerfile            | [releases](https://alpinelinux.org/releases/)                    |
@@ -111,7 +111,7 @@ See [examples/](examples/) for complete manifests covering all cases.
 docker buildx imagetools inspect golang:1.26-bookworm \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
-docker buildx imagetools inspect nginx/nginx-ingress:5.5.3 \
+docker buildx imagetools inspect nginx/nginx-ingress:5.5.4 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
 docker buildx imagetools inspect alpine:3.24 \
