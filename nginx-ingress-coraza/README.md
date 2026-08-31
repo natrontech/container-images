@@ -89,9 +89,9 @@ See [examples/](examples/) for complete manifests covering all cases.
 | Component                | Pinned version | Where to update                                             | Release page                                                     |
 | ------------------------ | -------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
 | NGINX Ingress Controller | `5.5.4`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
-| libcoraza                | `v1.6.0`       | `LIBCORAZA_VERSION` / `LIBCORAZA_SHA256` in Dockerfile      | [releases](https://github.com/corazawaf/libcoraza/releases)      |
-| coraza-nginx module      | `v0.20.0`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
-| OWASP CRS                | `v4.28.0`      | `CRS_VERSION` in Dockerfile                                 | [releases](https://github.com/coreruleset/coreruleset/releases)  |
+| libcoraza                | `v1.7.0`       | `LIBCORAZA_VERSION` / `LIBCORAZA_SHA256` in Dockerfile      | [releases](https://github.com/corazawaf/libcoraza/releases)      |
+| coraza-nginx module      | `v0.21.0`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
+| OWASP CRS                | `v4.29.0`      | `CRS_VERSION` in Dockerfile                                 | [releases](https://github.com/coreruleset/coreruleset/releases)  |
 | Go (builder)             | `1.26`         | `GO_VERSION` / `GO_DIGEST` in Dockerfile                    | [releases](https://go.dev/doc/devel/release)                     |
 | Alpine (CRS stage)       | `3.24`         | `ALPINE_VERSION` / `ALPINE_DIGEST` in Dockerfile            | [releases](https://alpinelinux.org/releases/)                    |
 
@@ -118,7 +118,7 @@ docker buildx imagetools inspect alpine:3.24 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
 # libcoraza SHA256 — computed from the tarball (no signed release artifact)
-curl -fsSL "https://github.com/corazawaf/libcoraza/tarball/v1.6.0" | sha256sum
+curl -fsSL "https://github.com/corazawaf/libcoraza/tarball/v1.7.0" | sha256sum
 ```
 
 > When bumping `NIC_VERSION`, also check the [coraza-nginx changelog](https://github.com/corazawaf/coraza-nginx/releases) for a newer `CORAZA_NGINX_VERSION` — newer NGINX versions occasionally change internal C APIs the module hooks into, causing a compile error. The ABI recompilation itself is automatic: Stage 2 reads `nginx -v` at build time and compiles the module against the matching NGINX source.

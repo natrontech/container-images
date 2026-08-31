@@ -2,15 +2,15 @@
 # Global build args — declared before any FROM so they are available in all FROM instructions.
 # To use a value inside a stage's RUN commands, redeclare with ARG <name> (inherits global default).
 ARG GO_VERSION=1.26
-ARG GO_DIGEST=sha256:1ecb7edf62a0408027bd5729dfd6b1b8766e578e8df93995b225dfd0944eb651
+ARG GO_DIGEST=sha256:e8c859f5632dcfde7b32d2012b4351728f6437930887c2f6a91ea242459e5514
 ARG NIC_VERSION=5.5.4
-ARG NIC_DIGEST=sha256:edf72ac2ae6b128921cbf2fe5044d9c183fec01204578aa5efbbda7320bc10ad
+ARG NIC_DIGEST=sha256:379143154a02d16e4b7d56ad505636bdf73b2c190825ef023c803958ba5eb57c
 ARG ALPINE_VERSION=3.24
 ARG ALPINE_DIGEST=sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
-ARG LIBCORAZA_VERSION=v1.6.0
-ARG LIBCORAZA_SHA256=27158bfe16314e46fc4c276c2cb3e04519ed548337fc961155636768fb44be4a
-ARG CORAZA_NGINX_VERSION=v0.20.0
-ARG CRS_VERSION=v4.28.0
+ARG LIBCORAZA_VERSION=v1.7.0
+ARG LIBCORAZA_SHA256=47c4023b34e311a16d41e0e823d74f7f5496c16ac1df9f852deeb34a8524a16c
+ARG CORAZA_NGINX_VERSION=v0.21.0
+ARG CRS_VERSION=v4.29.0
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 1: Build libcoraza (Go → C shared/static library)
