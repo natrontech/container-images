@@ -4,4 +4,6 @@ rules:
   # The nginx/nginx-ingress base image has internal layer duplication (nginx
   # binaries, libcrypto, libssl) that dive attributes to user waste. Threshold
   # is relaxed to account for that unavoidable base-image overhead.
-  highestUserWastedPercent: 0.20
+  # The 2026-08-30 upstream rebuild of 5.5.4 raised the bare base image to
+  # 0.296 user-wasted (our layers dilute it to ~0.24), hence 0.20 → 0.25.
+  highestUserWastedPercent: 0.25
