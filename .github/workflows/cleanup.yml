@@ -6,10 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       max_age_days:
-        description: 'Minimum age in days before deleting untagged/orphaned versions'
+        description: 'Minimum age in days before deleting unreferenced versions'
         required: false
         default: '30'
         type: string
+      dry_run:
+        description: 'Only log what would be deleted'
+        required: false
+        default: true
+        type: boolean
 
 permissions: {}
 
@@ -38,7 +43,7 @@ jobs:
           done
           json_array="["
           for i in "${!containers[@]}"; do
-            if [ $i -gt 0 ]; then json_array+=","; fi
+            if [ "$i" -gt 0 ]; then json_array+=","; fi
             json_array+="\"${containers[$i]}\""
           done
           json_array+="]"
@@ -52,114 +57,230 @@ jobs:
       packages: write
     env:
       MAX_AGE_DAYS: ${{ github.event.inputs.max_age_days || '30' }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Delete old untagged versions and orphaned attestation blobs
+      - name: Delete unreferenced versions and orphaned attestation blobs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           script: |
             const containers = ${{ needs.discover-containers.outputs.containers }};
-            const maxAgeDays = parseInt(process.env.MAX_AGE_DAYS);
-            const cutoffDate = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+            const maxAgeDays = parseInt(process.env.MAX_AGE_DAYS, 10);
+            const dryRun = process.env.DRY_RUN === 'true';
+            const cutoffDate = new Date(Date.now() - maxAgeDays * 86_400_000);
             const org = context.repo.owner;
 
-            // Fixed tags that must never be deleted: sha-<hex> or semver-like (e.g. 5.4.1)
-            const FIXED_TAG_RE = /^(sha-[a-f0-9]+|[0-9]+\.[0-9]+.*)$/;
+            // Tags that exist only to attach cosign signatures/attestations to an
+            // image digest: sha256-<hex>.sig / .att / .sbom (old bundle format) and
+            // bare sha256-<hex> (OCI referrer tag-schema fallback). Everything else
+            // (semver, sha-<commit>, latest, nightly, ...) is a "real" tag and the
+            // version carrying it is untouchable.
+            const ATTESTATION_TAG_RE = /^sha256-[a-f0-9]{64}(\.(att|sig|sbom))?$/;
 
-            // Cosign attestation/signature blobs (old bundle format):
-            //   sha256-<64-hex>.att  — SBOM / provenance attestation
-            //   sha256-<64-hex>.sig  — image signature
-            // OCI referrer tag schema fallback:
-            //   sha256-<64-hex>      — referrer without extension
-            const ATTESTATION_TAG_RE = /^sha256-[a-f0-9]{64}(\.(att|sig))?$/;
+            const ACCEPT = [
+              'application/vnd.oci.image.index.v1+json',
+              'application/vnd.docker.distribution.manifest.list.v2+json',
+              'application/vnd.oci.image.manifest.v1+json',
+              'application/vnd.docker.distribution.manifest.v2+json',
+            ].join(', ');
 
-            core.info(`Cutoff date: ${cutoffDate.toISOString()} (${maxAgeDays} days)`);
+            async function registryToken(repoPath) {
+              const auth = Buffer.from(`x:${process.env.GHCR_TOKEN}`).toString('base64');
+              const res = await fetch(
+                `https://ghcr.io/token?service=ghcr.io&scope=repository:${repoPath}:pull`,
+                { headers: { Authorization: `Basic ${auth}` } }
+              );
+              if (!res.ok) throw new Error(`registry token exchange failed: HTTP ${res.status}`);
+              return (await res.json()).token;
+            }
+
+            // Returns the parsed manifest, or null if it does not exist (404).
+            // Any other failure throws.
+            async function getManifest(repoPath, token, ref) {
+              const res = await fetch(`https://ghcr.io/v2/${repoPath}/manifests/${ref}`, {
+                headers: { Authorization: `Bearer ${token}`, Accept: ACCEPT },
+              });
+              if (res.status === 404) return null;
+              if (!res.ok) throw new Error(`GET manifest ${ref}: HTTP ${res.status}`);
+              return await res.json();
+            }
+
+            async function listTags(repoPath, token) {
+              let tags = [];
+              let url = `https://ghcr.io/v2/${repoPath}/tags/list?n=1000`;
+              while (url) {
+                const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.status === 404) return []; // package never published
+                if (!res.ok) throw new Error(`GET tags/list: HTTP ${res.status}`);
+                tags = tags.concat((await res.json()).tags ?? []);
+                const next = (res.headers.get('link') ?? '').match(/<([^>]+)>;\s*rel="next"/);
+                url = next ? new URL(next[1], 'https://ghcr.io').toString() : null;
+              }
+              return tags;
+            }
+
+            core.info(`Cutoff date: ${cutoffDate.toISOString()} (${maxAgeDays} days), dry-run: ${dryRun}`);
+
+            const skippedPackages = [];
 
             for (const container of containers) {
               const packageName = `container-images/${container}`;
+              const repoPath = `${org}/${packageName}`.toLowerCase();
               core.info(`\nProcessing: ${packageName}`);
 
-              let versions;
+              let versions, token;
               try {
                 versions = await github.paginate(
                   github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
-                  { package_type: 'container', package_name: packageName, org }
+                  { package_type: 'container', package_name: packageName, org, per_page: 100 }
                 );
+                token = await registryToken(repoPath);
               } catch (err) {
-                core.warning(`Could not list versions for ${packageName}: ${err.message}`);
+                core.warning(`Skipping ${packageName}: ${err.message}`);
+                skippedPackages.push(packageName);
                 continue;
               }
 
-              // Collect the digests of every version that carries a fixed tag.
-              // These are the parent images we must never orphan.
-              // version.name is the image digest (sha256:...)
-              const keepDigests = new Set(
-                versions
-                  .filter(v => (v.metadata?.container?.tags ?? []).some(t => FIXED_TAG_RE.test(t)))
-                  .map(v => v.name)
+              // ---- Build the set of digests reachable from ANY tag. ----
+              // A tagged multi-arch (or provenance-attested) image is an OCI index;
+              // its per-arch manifests and buildx provenance/SBOM manifests are
+              // separate *untagged* package versions. Deleting them breaks every
+              // pull of the tag, so walk each tagged manifest and protect
+              // everything it references, recursively.
+              const tagsOf = v => v.metadata?.container?.tags ?? [];
+              const taggedDigests = new Set(
+                versions.filter(v => tagsOf(v).length > 0).map(v => v.name)
               );
 
-              core.info(`  Protected digests (fixed tags): ${keepDigests.size}`);
-
-              let deleted = 0;
-
-              for (const version of versions) {
-                const tags = version.metadata?.container?.tags ?? [];
-                const updatedAt = new Date(version.updated_at);
-                const ageDays = Math.floor((Date.now() - updatedAt) / 86_400_000);
-
-                // Never touch versions that carry a fixed tag (sha-*, semver)
-                if (tags.some(t => FIXED_TAG_RE.test(t))) continue;
-
-                // Orphaned attestation / signature blobs (old cosign bundle format).
-                // Delete when: parent digest is not in the keep set AND old enough.
-                const attTag = tags.find(t => ATTESTATION_TAG_RE.test(t));
-                if (attTag) {
-                  const parentDigest = 'sha256:' + attTag
-                    .replace(/^sha256-/, '')
-                    .replace(/\.(att|sig)$/, '');
-                  if (!keepDigests.has(parentDigest) && updatedAt < cutoffDate) {
-                    core.info(`  Deleting orphaned blob ${version.id} tag=${attTag} age=${ageDays}d`);
-                    try {
-                      await github.rest.packages.deletePackageVersionForOrg({
-                        package_type: 'container', package_name: packageName,
-                        org, package_version_id: version.id,
-                      });
-                      deleted++;
-                    } catch (err) {
-                      core.warning(`  Failed to delete ${version.id}: ${err.message}`);
-                    }
-                  }
-                  continue;
+              const reachable = new Set(taggedDigests);
+              const queue = [...taggedDigests];
+              let walkFailed = false;
+              while (queue.length > 0) {
+                const digest = queue.pop();
+                let manifest;
+                try {
+                  manifest = await getManifest(repoPath, token, digest);
+                } catch (err) {
+                  core.warning(`Manifest walk failed at ${digest}: ${err.message}`);
+                  walkFailed = true;
+                  break;
                 }
-
-                // Untagged versions: old latest/nightly images whose mutable tags
-                // have moved to a newer build. Delete when old enough.
-                if (tags.length === 0 && updatedAt < cutoffDate) {
-                  core.info(`  Deleting untagged version ${version.id} age=${ageDays}d`);
-                  try {
-                    await github.rest.packages.deletePackageVersionForOrg({
-                      package_type: 'container', package_name: packageName,
-                      org, package_version_id: version.id,
-                    });
-                    deleted++;
-                  } catch (err) {
-                    core.warning(`  Failed to delete ${version.id}: ${err.message}`);
+                if (manifest === null) continue; // dangling reference — nothing to protect beneath it
+                for (const child of manifest.manifests ?? []) {
+                  if (!reachable.has(child.digest)) {
+                    reachable.add(child.digest);
+                    queue.push(child.digest);
                   }
                 }
               }
+              if (walkFailed) {
+                // Fail safe: without the complete reference graph we cannot know
+                // what is garbage, so delete nothing in this package.
+                core.warning(`Incomplete reference graph for ${packageName} — skipping ALL deletions for this package.`);
+                skippedPackages.push(packageName);
+                continue;
+              }
 
-              core.info(`  Deleted ${deleted} version(s) for ${packageName}`);
+              core.info(`  ${taggedDigests.size} tagged, ${reachable.size} reachable, ${versions.length} total version(s)`);
+
+              let deleted = 0;
+              const remove = async (version, reason) => {
+                const age = Math.floor((Date.now() - new Date(version.updated_at)) / 86_400_000);
+                core.info(`  ${dryRun ? '[dry-run] would delete' : 'Deleting'} ${version.id} ${version.name} tags=[${tagsOf(version)}] age=${age}d — ${reason}`);
+                if (dryRun) { deleted++; return; }
+                try {
+                  await github.rest.packages.deletePackageVersionForOrg({
+                    package_type: 'container', package_name: packageName,
+                    org, package_version_id: version.id,
+                  });
+                  deleted++;
+                } catch (err) {
+                  core.warning(`  Failed to delete ${version.id}: ${err.message}`);
+                }
+              };
+
+              for (const version of versions) {
+                const tags = tagsOf(version);
+                if (new Date(version.updated_at) >= cutoffDate) continue; // too young — never touch
+                if (reachable.has(version.name)) continue;                // referenced by a tag — never touch
+
+                if (tags.length > 0) {
+                  // A tagged version may only be deleted if ALL of its tags are
+                  // attestation-style and every parent digest they point at is gone.
+                  if (!tags.every(t => ATTESTATION_TAG_RE.test(t))) continue;
+                  const parents = tags.map(t =>
+                    'sha256:' + t.replace(/^sha256-/, '').replace(/\.(att|sig|sbom)$/, ''));
+                  if (parents.some(p => reachable.has(p))) continue;
+                  await remove(version, 'orphaned signature/attestation blob');
+                  continue;
+                }
+
+                // Untagged and unreachable. Last guard: a cosign referrer (new
+                // bundle format) is an untagged manifest whose `subject` points at
+                // the image it attests — keep it while its subject is alive.
+                let manifest;
+                try {
+                  manifest = await getManifest(repoPath, token, version.name);
+                } catch (err) {
+                  core.warning(`  Could not inspect ${version.name} — keeping it: ${err.message}`);
+                  continue;
+                }
+                if (manifest?.subject?.digest && reachable.has(manifest.subject.digest)) continue;
+                await remove(version, 'untagged and not referenced by any tag');
+              }
+
+              core.info(`  ${dryRun ? 'Would delete' : 'Deleted'} ${deleted} version(s) for ${packageName}`);
+            }
+
+            // ---- Post-cleanup integrity verification. ----
+            // Every remaining non-attestation tag must fully resolve: its manifest
+            // exists and, for an index, every referenced child manifest exists.
+            core.info('\nVerifying that every tag still fully resolves...');
+            const broken = [];
+            for (const container of containers) {
+              const repoPath = `${org}/container-images/${container}`.toLowerCase();
+              try {
+                const token = await registryToken(repoPath);
+                for (const tag of await listTags(repoPath, token)) {
+                  if (ATTESTATION_TAG_RE.test(tag)) continue;
+                  const manifest = await getManifest(repoPath, token, tag);
+                  if (manifest === null) {
+                    broken.push(`${container}:${tag} — manifest missing`);
+                    continue;
+                  }
+                  for (const child of manifest.manifests ?? []) {
+                    if (await getManifest(repoPath, token, child.digest) === null) {
+                      broken.push(`${container}:${tag} — child ${child.digest} missing`);
+                    }
+                  }
+                }
+              } catch (err) {
+                broken.push(`${container} — verification errored: ${err.message}`);
+              }
+            }
+
+            if (skippedPackages.length > 0) {
+              core.warning(`Packages skipped due to errors: ${skippedPackages.join(', ')}`);
+            }
+            if (broken.length > 0) {
+              core.setFailed(
+                `Registry integrity check failed — ${broken.length} broken reference(s):\n` +
+                broken.map(b => `  ${b}`).join('\n')
+              );
+            } else {
+              core.info('All tags fully resolvable.');
             }
 
       - name: Summary
+        if: always()
         run: |
-          echo "## Container Cleanup Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Deleted untagged versions and orphaned attestation blobs older than **${MAX_AGE_DAYS} days**." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Never deleted:** versions tagged with \`sha-*\` or a version number (e.g. \`5.4.1\`) and their attestations." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Container Cleanup Summary"
+            echo ""
+            echo "Dry-run: **${DRY_RUN}** — deleted versions older than **${MAX_AGE_DAYS} days** that are unreachable from any tag."
+            echo ""
+            echo "**Never deleted:** any version carrying a non-attestation tag, any manifest referenced (directly or transitively) by a tagged image index (per-arch manifests, provenance/SBOM manifests), cosign referrers whose subject is alive, and attestation blobs whose parent digest is alive."
+            echo ""
+            echo "The run fails if any tag no longer fully resolves after cleanup."
+          } >> "$GITHUB_STEP_SUMMARY"
