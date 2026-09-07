@@ -17,6 +17,7 @@ When publishing a new version, add a row to the component version matrix **and**
 
 | Image version | Published  | NIC     | coraza-nginx | libcoraza | OWASP CRS | Go (builder) | Alpine (CRS stage) |
 | ------------- | ---------- | ------- | ------------ | --------- | --------- | ------------ | ------------------ |
+| `5.6.1`       | 2026-09-07 | `5.6.1` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.27`       | `3.24`             |
 | `5.6.0`       | 2026-09-03 | `5.6.0` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.27`       | `3.24`             |
 | `5.5.4-2`     | 2026-08-31 | `5.5.4` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.26`       | `3.24`             |
 | `5.5.4`       | 2026-07-28 | `5.5.4` | `v0.20.0`    | `v1.6.0`  | `v4.28.0` | `1.26`       | `3.24`             |
@@ -32,6 +33,13 @@ Older releases (`5.4.3` and earlier) predate this changelog — see the git hist
 For details on upstream changes, always check the linked release notes.
 
 ## [Unreleased]
+
+## [5.6.1] - 2026-09-07
+
+### Changed
+
+- NIC `5.6.0` → `5.6.1` (NGINX OSS 1.31.4, unchanged) — release notes: [v5.6.1](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.6.1) (bugfix release: path quoting on v1 Ingress)
+- all other components unchanged (already latest): coraza-nginx `v0.21.0`, libcoraza `v1.7.0`, OWASP CRS `v4.29.0`, Go `1.27`, Alpine `3.24` — no base-image digest drift
 
 ## [5.6.0] - 2026-09-03
 
@@ -97,7 +105,8 @@ For details on upstream changes, always check the linked release notes.
 - NIC `5.4.3` → `5.5.0` — release notes: [v5.5.0](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.0)
 
 <!-- Older versions have no nginx-ingress-coraza-<version> git tag (tagging was introduced with 5.5.3), so no compare links exist for them. -->
-[unreleased]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.0...HEAD
+[unreleased]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.1...HEAD
+[5.6.1]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.0...nginx-ingress-coraza-5.6.1
 [5.6.0]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.5.4-2...nginx-ingress-coraza-5.6.0
 [5.5.4-2]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.5.4...nginx-ingress-coraza-5.5.4-2
 [5.5.4]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.5.3...nginx-ingress-coraza-5.5.4
