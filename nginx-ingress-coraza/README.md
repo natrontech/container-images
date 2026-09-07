@@ -88,7 +88,7 @@ See [examples/](examples/) for complete manifests covering all cases.
 
 | Component                | Pinned version | Where to update                                             | Release page                                                     |
 | ------------------------ | -------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
-| NGINX Ingress Controller | `5.6.0`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
+| NGINX Ingress Controller | `5.6.1`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
 | libcoraza                | `v1.7.0`       | `LIBCORAZA_VERSION` / `LIBCORAZA_SHA256` in Dockerfile      | [releases](https://github.com/corazawaf/libcoraza/releases)      |
 | coraza-nginx module      | `v0.21.0`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
 | OWASP CRS                | `v4.29.0`      | `CRS_VERSION` in Dockerfile                                 | [releases](https://github.com/coreruleset/coreruleset/releases)  |
@@ -111,7 +111,7 @@ See [examples/](examples/) for complete manifests covering all cases.
 docker buildx imagetools inspect golang:1.27-bookworm \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
-docker buildx imagetools inspect nginx/nginx-ingress:5.6.0 \
+docker buildx imagetools inspect nginx/nginx-ingress:5.6.1 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
 docker buildx imagetools inspect alpine:3.24 \
