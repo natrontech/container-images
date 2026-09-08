@@ -59,3 +59,123 @@ updates:
       docker-dependencies:
         patterns:
           - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/jupyter-scipy-nbgitpuller"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ":robot:"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 5
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/jupyter-pytorch-nbgitpuller"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ":robot:"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 5
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/jupyter-tensorflow-nbgitpuller"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ":robot:"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 5
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "pip"
+    directory: "/jupyter-scipy-nbgitpuller"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ":seedling:"
+    labels:
+      - "dependencies"
+      - "python"
+    open-pull-requests-limit: 5
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "pip"
+    directory: "/jupyter-pytorch-nbgitpuller"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ":seedling:"
+    labels:
+      - "dependencies"
+      - "python"
+    open-pull-requests-limit: 5
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "pip"
+    directory: "/jupyter-tensorflow-nbgitpuller"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Europe/Zurich"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ":seedling:"
+    labels:
+      - "dependencies"
+      - "python"
+    open-pull-requests-limit: 5
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"

@@ -1,0 +1,4 @@
+# Pinned so Dependabot's pip ecosystem can raise a PR when a new release
+# appears. A pin inside a Dockerfile RUN is invisible to Dependabot: its
+# docker ecosystem only tracks the FROM line.
+nbgitpuller==1.3.0
