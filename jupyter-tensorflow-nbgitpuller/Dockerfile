@@ -11,7 +11,7 @@
 # whichever server the user currently has running, with no profile selection.
 # A student sitting on a GPU profile who clicks a course link would otherwise
 # get a 404, so every profile a student can be on needs the extension.
-FROM quay.io/jupyter/tensorflow-notebook:cuda-2026-09-01@sha256:4eec486ebade2506351ecbf78bc0ef6992ebde61bfb21cd26e2eac2934468cf3
+FROM quay.io/jupyter/tensorflow-notebook:cuda-2026-09-21@sha256:4ff71a3b7dd311f7ff574a7c60dd8e76ad0d4d7e785db3bc4e4265a13ecb6aa5
 
 # The base image already drops to this user; repeated so the Dockerfile is
 # explicit about not installing as root.
