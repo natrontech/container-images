@@ -11,7 +11,7 @@
 # whichever server the user currently has running, with no profile selection.
 # A student sitting on a GPU profile who clicks a course link would otherwise
 # get a 404, so every profile a student can be on needs the extension.
-FROM quay.io/jupyter/pytorch-notebook:cuda12-2026-09-01@sha256:dd8e8caed704a61b1e67aac3df981b83bca5b6015903047ebbe584b968022aae
+FROM quay.io/jupyter/pytorch-notebook:cuda12-2026-09-21@sha256:dfdd544ac7fb03e67065464029511079e64c38d74e18eb93a161f6c4b27d6a8a
 
 # The base image already drops to this user; repeated so the Dockerfile is
 # explicit about not installing as root.
