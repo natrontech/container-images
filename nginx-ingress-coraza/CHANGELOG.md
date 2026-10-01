@@ -17,6 +17,7 @@ When publishing a new version, add a row to the component version matrix **and**
 
 | Image version | Published  | NIC     | coraza-nginx | libcoraza | OWASP CRS | Go (builder) | Alpine (CRS stage) |
 | ------------- | ---------- | ------- | ------------ | --------- | --------- | ------------ | ------------------ |
+| `5.6.3`       | 2026-10-01 | `5.6.3` | `v0.21.0`    | `v1.8.0`  | `v4.29.0` | `1.27`       | `3.24`             |
 | `5.6.1`       | 2026-09-07 | `5.6.1` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.27`       | `3.24`             |
 | `5.6.0`       | 2026-09-03 | `5.6.0` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.27`       | `3.24`             |
 | `5.5.4-2`     | 2026-08-31 | `5.5.4` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.26`       | `3.24`             |
@@ -33,6 +34,15 @@ Older releases (`5.4.3` and earlier) predate this changelog — see the git hist
 For details on upstream changes, always check the linked release notes.
 
 ## [Unreleased]
+
+## [5.6.3] - 2026-10-01
+
+### Changed
+
+- NIC `5.6.1` → `5.6.3` (NGINX OSS 1.31.4 → 1.31.6) — release notes: [v5.6.2](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.6.2) (bugfix: `updateAllConfigsOnBatch` is reset after batch mode ends; NGINX OSS update), [v5.6.3](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.6.3) (NGINX OSS 1.31.6)
+- libcoraza `v1.7.0` → `v1.8.0` — release notes: [v1.8.0](https://github.com/corazawaf/libcoraza/releases/tag/v1.8.0) (exports `coraza_is_response_body_accessible` to C consumers). coraza-nginx `v0.21.0` gates on libcoraza >= 1.7 at build and runtime, so 1.8 is accepted without a module change
+- coraza-nginx `v0.21.0` and OWASP CRS `v4.29.0` unchanged (already latest)
+- refreshed drifted base-image digests: `golang:1.27-bookworm` (Go 1.27.1) and `alpine:3.24` (Alpine 3.24.2)
 
 ## [5.6.1] - 2026-09-07
 
@@ -105,7 +115,8 @@ For details on upstream changes, always check the linked release notes.
 - NIC `5.4.3` → `5.5.0` — release notes: [v5.5.0](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.0)
 
 <!-- Older versions have no nginx-ingress-coraza-<version> git tag (tagging was introduced with 5.5.3), so no compare links exist for them. -->
-[unreleased]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.1...HEAD
+[unreleased]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.3...HEAD
+[5.6.3]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.1...nginx-ingress-coraza-5.6.3
 [5.6.1]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.0...nginx-ingress-coraza-5.6.1
 [5.6.0]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.5.4-2...nginx-ingress-coraza-5.6.0
 [5.5.4-2]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.5.4...nginx-ingress-coraza-5.5.4-2
