@@ -17,6 +17,7 @@ When publishing a new version, add a row to the component version matrix **and**
 
 | Image version | Published  | NIC     | coraza-nginx | libcoraza | OWASP CRS | Go (builder) | Alpine (CRS stage) |
 | ------------- | ---------- | ------- | ------------ | --------- | --------- | ------------ | ------------------ |
+| `5.7.0`       | 2026-10-21 | `5.7.0` | `v0.23.0`    | `v1.8.0`  | `v4.30.0` | `1.27`       | `3.24`             |
 | `5.6.3`       | 2026-10-01 | `5.6.3` | `v0.21.0`    | `v1.8.0`  | `v4.29.0` | `1.27`       | `3.24`             |
 | `5.6.1`       | 2026-09-07 | `5.6.1` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.27`       | `3.24`             |
 | `5.6.0`       | 2026-09-03 | `5.6.0` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.27`       | `3.24`             |
@@ -34,6 +35,16 @@ Older releases (`5.4.3` and earlier) predate this changelog — see the git hist
 For details on upstream changes, always check the linked release notes.
 
 ## [Unreleased]
+
+## [5.7.0] - 2026-10-21
+
+### Changed
+
+- NIC `5.6.3` → `5.7.0` (NGINX OSS 1.31.6 → 1.31.7) — release notes: [v5.7.0](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0) (feature release: `least_time` load balancing on OSS, HTTP/2 upstream proxying and per-server HTTP/2 toggle, `use-forwarded-headers` ConfigMap key, opaque Secret support, `-latency-metrics-buckets` flag, topology-aware traffic distribution, cert-manager HTTP-01 challenges pass through TLS redirect and auth; plus a security-hardening sync)
+- coraza-nginx `v0.21.0` → `v0.23.0` — release notes: [v0.22.0](https://github.com/corazawaf/coraza-nginx/releases/tag/v0.22.0) (request body submitted to Coraza exactly once, phase 4 finalised before headers when the body is not inspected, bounded file-backed response inspection, WAF instances deduplicated by rule content, `SecRemoteRules` and rule-less `coraza on` now rejected at `nginx -t`), [v0.23.0](https://github.com/corazawaf/coraza-nginx/releases/tag/v0.23.0) (transaction bound to the final location after rewrites, **every disruptive intervention now blocks — including bare `drop` and `deny,status:200`**, response headers inspected after the gzip/range filters, phase 4 finalised for bodyless 204/304 responses, policy redirects replace an existing `Location` header). Requires libcoraza >= 1.8.0, gated at build and runtime — already pinned
+- OWASP CRS `v4.29.0` → `v4.30.0` — release notes: [v4.30.0](https://github.com/coreruleset/coreruleset/releases/tag/v4.30.0). Three security advisories: [GHSA-575j-qr6p-9763](https://github.com/coreruleset/coreruleset/security/advisories/GHSA-575j-qr6p-9763) (932 RCE rules now inspect `REQUEST_FILENAME`, closing a path-based command-injection bypass), [GHSA-89h9-2j8h-9gp2](https://github.com/coreruleset/coreruleset/security/advisories/GHSA-89h9-2j8h-9gp2) (mixed-case `CHARSET=` could skip the allow-list, 920480), [GHSA-qmx4-jfcv-fgww](https://github.com/coreruleset/coreruleset/security/advisories/GHSA-qmx4-jfcv-fgww) (a second `_charset_` value could shadow a disallowed charset, 922100). Also fixes the broken "skip checking responses" feature, allows `application/*+json` and AWS JSON content types by default, adds `.claude` to restricted files
+- libcoraza `v1.8.0` unchanged (already latest)
+- refreshed drifted `golang:1.27-bookworm` builder digest (Go 1.27.1 → 1.27.3); `alpine:3.24` digest unchanged
 
 ## [5.6.3] - 2026-10-01
 
@@ -115,7 +126,8 @@ For details on upstream changes, always check the linked release notes.
 - NIC `5.4.3` → `5.5.0` — release notes: [v5.5.0](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.0)
 
 <!-- Older versions have no nginx-ingress-coraza-<version> git tag (tagging was introduced with 5.5.3), so no compare links exist for them. -->
-[unreleased]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.3...HEAD
+[unreleased]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.7.0...HEAD
+[5.7.0]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.3...nginx-ingress-coraza-5.7.0
 [5.6.3]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.1...nginx-ingress-coraza-5.6.3
 [5.6.1]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.6.0...nginx-ingress-coraza-5.6.1
 [5.6.0]: https://github.com/natrontech/container-images/compare/nginx-ingress-coraza-5.5.4-2...nginx-ingress-coraza-5.6.0
