@@ -40,7 +40,7 @@ pre-commit run --all-files
 1. Create a directory at the repo root: `mkdir <name>`
 2. Add a `Dockerfile` inside it
 3. Optionally add a `VERSION` file (e.g. `1.0.0`) to publish an immutable version tag and SLSA provenance
-4. Optionally add a `PLATFORMS` file to restrict platforms (default: `linux/amd64,linux/arm64`)
+4. Optionally add a `PLATFORMS` file to restrict platforms (default: `linux/amd64,linux/arm64`), and an empty `NO_NIGHTLY` file if every input is pinned and a nightly rebuild would only re-push the same image
 5. Add a docker entry for the new directory to `.github/dependabot.yml`
 6. Push to main — auto-discovered on next build
 7. Run `./scripts/validate-workflow.sh` to verify discovery works locally

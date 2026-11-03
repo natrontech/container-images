@@ -34,6 +34,8 @@ discover-containers
 
 **Multi-arch:** `linux/amd64,linux/arm64` by default. A `PLATFORMS` file in the container directory overrides this (e.g. `linux/amd64` only).
 
+**Skip nightly:** an empty `NO_NIGHTLY` file in the container directory excludes it from the scheduled build. Use it when every input is pinned (base image by digest, packages by version), so a nightly rebuild would only re-push the same image. Push and manual builds still include it, and its `:nightly` tag stays on the last nightly build.
+
 ---
 
 ## cleanup.yml

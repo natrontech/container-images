@@ -45,6 +45,10 @@ jobs:
           # Find all directories containing Dockerfiles
           containers=()
           for dir in */; do
+            # NO_NIGHTLY: every input is pinned, so a scheduled rebuild only re-pushes the same image
+            if [[ "$GITHUB_EVENT_NAME" == "schedule" && -f "${dir}NO_NIGHTLY" ]]; then
+              continue
+            fi
             if [[ -f "${dir}Dockerfile" ]]; then
               container_name=$(basename "$dir")
               containers+=("$container_name")
@@ -139,6 +143,13 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      # ponytail: the CUDA Jupyter bases can fill the runner's free disk (2026-11-03 nightly); move to a larger runner if this stops being enough
+      - name: Free disk space
+        if: startsWith(matrix.container, 'jupyter-')
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
