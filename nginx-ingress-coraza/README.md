@@ -88,12 +88,15 @@ See [examples/](examples/) for complete manifests covering all cases.
 
 | Component                | Pinned version | Where to update                                             | Release page                                                     |
 | ------------------------ | -------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
-| NGINX Ingress Controller | `5.7.0`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
-| libcoraza                | `v1.8.0`       | `LIBCORAZA_VERSION` / `LIBCORAZA_SHA256` in Dockerfile      | [releases](https://github.com/corazawaf/libcoraza/releases)      |
+| NGINX Ingress Controller | `5.7.1`        | `NIC_VERSION` / `NIC_DIGEST` in Dockerfile + `VERSION` file | [releases](https://github.com/nginx/kubernetes-ingress/releases) |
+| libcoraza                | `main@3ab0726` | `LIBCORAZA_VERSION` / `LIBCORAZA_SHA256` in Dockerfile      | [releases](https://github.com/corazawaf/libcoraza/releases)      |
 | coraza-nginx module      | `v0.23.0`      | `CORAZA_NGINX_VERSION` in Dockerfile                        | [releases](https://github.com/corazawaf/coraza-nginx/releases)   |
 | OWASP CRS                | `v4.30.0`      | `CRS_VERSION` in Dockerfile                                 | [releases](https://github.com/coreruleset/coreruleset/releases)  |
 | Go (builder)             | `1.27`         | `GO_VERSION` / `GO_DIGEST` in Dockerfile                    | [releases](https://go.dev/doc/devel/release)                     |
 | Alpine (CRS stage)       | `3.24`         | `ALPINE_VERSION` / `ALPINE_DIGEST` in Dockerfile            | [releases](https://alpinelinux.org/releases/)                    |
+
+> [!IMPORTANT]
+> libcoraza is temporarily pinned to commit [`3ab0726`](https://github.com/corazawaf/libcoraza/commit/3ab07264b48fb52f3dc32997f9ae4a3d332cd7a5) on `main` instead of a release tag. `v1.8.0`, the latest release, still embeds Coraza `v3.7.0`, which is affected by the Coraza advisories published 2026-10-02 (fixed in `v3.8.1`). As soon as libcoraza tags a release after `v1.8.0` whose `go.mod` pins `github.com/corazawaf/coraza/v3` `>= v3.8.1`, switch `LIBCORAZA_VERSION` back to that tag, recompute `LIBCORAZA_SHA256`, and remove the `TEMPORARY` comment in the Dockerfile and this note. Check the embedded Coraza version of a build with `go version -m libcoraza.so | grep corazawaf/coraza`.
 
 **Update procedure:**
 
@@ -111,14 +114,15 @@ See [examples/](examples/) for complete manifests covering all cases.
 docker buildx imagetools inspect golang:1.27-bookworm \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
-docker buildx imagetools inspect nginx/nginx-ingress:5.7.0 \
+docker buildx imagetools inspect nginx/nginx-ingress:5.7.1 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
 docker buildx imagetools inspect alpine:3.24 \
   --format '{{json .Manifest}}' | jq -r '.digest'
 
 # libcoraza SHA256 — computed from the tarball (no signed release artifact)
-curl -fsSL "https://github.com/corazawaf/libcoraza/tarball/v1.8.0" | sha256sum
+# (works for a release tag or a full commit SHA)
+curl -fsSL "https://github.com/corazawaf/libcoraza/tarball/3ab07264b48fb52f3dc32997f9ae4a3d332cd7a5" | sha256sum
 ```
 
 > When bumping `NIC_VERSION`, also check the [coraza-nginx changelog](https://github.com/corazawaf/coraza-nginx/releases) for a newer `CORAZA_NGINX_VERSION` — newer NGINX versions occasionally change internal C APIs the module hooks into, causing a compile error. The ABI recompilation itself is automatic: Stage 2 reads `nginx -v` at build time and compiles the module against the matching NGINX source.

@@ -2,13 +2,16 @@
 # Global build args — declared before any FROM so they are available in all FROM instructions.
 # To use a value inside a stage's RUN commands, redeclare with ARG <name> (inherits global default).
 ARG GO_VERSION=1.27
-ARG GO_DIGEST=sha256:32fa283222e2905d9fee971f60c842e5c815fdc036cf7ea599bf36bd7ca8f67f
-ARG NIC_VERSION=5.7.0
-ARG NIC_DIGEST=sha256:cc0619972b71069f08c95ce1aafb2ede0b5c1b9739edf12413cc795fdf2a6733
+ARG GO_DIGEST=sha256:dc0963f32053e4bc451d24d87e3892d42d01021b61f093e98eb95c0352bb84b0
+ARG NIC_VERSION=5.7.1
+ARG NIC_DIGEST=sha256:442a6a76b55bb30fcdf38934cd2b3e3e148fcfcd3170c6b4d3961e5a1967279f
 ARG ALPINE_VERSION=3.24
-ARG ALPINE_DIGEST=sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-ARG LIBCORAZA_VERSION=v1.8.0
-ARG LIBCORAZA_SHA256=7be0bce6fe29323fe7980198a3687819d19a89a47277f9e9ebc22f90c18473c8
+ARG ALPINE_DIGEST=sha256:3f4d6b32e26703c6082839234f43769d5046b3ac7c910033911d1e71d8cd630a
+# TEMPORARY: libcoraza is pinned to a main commit because no release ships Coraza >= v3.8.1 yet
+# (v1.8.0 embeds Coraza v3.7.0, affected by GHSA-6gcq-wc29-5xf2, GHSA-6r3q-mjv7-xr8m and others).
+# Switch back to the first libcoraza release tag after v1.8.0 whose go.mod has coraza/v3 >= v3.8.1.
+ARG LIBCORAZA_VERSION=3ab07264b48fb52f3dc32997f9ae4a3d332cd7a5
+ARG LIBCORAZA_SHA256=73bc8c688c73d83f9efae81f7ae6032c9337054e2154c3fe2fe1d98fee9f9fbe
 ARG CORAZA_NGINX_VERSION=v0.23.0
 ARG CRS_VERSION=v4.30.0
 

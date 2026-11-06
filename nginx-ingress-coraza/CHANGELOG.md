@@ -15,26 +15,46 @@ When publishing a new version, add a row to the component version matrix **and**
 
 ## Component version matrix
 
-| Image version | Published  | NIC     | coraza-nginx | libcoraza | OWASP CRS | Go (builder) | Alpine (CRS stage) |
-| ------------- | ---------- | ------- | ------------ | --------- | --------- | ------------ | ------------------ |
-| `5.7.0`       | 2026-10-21 | `5.7.0` | `v0.23.0`    | `v1.8.0`  | `v4.30.0` | `1.27`       | `3.24`             |
-| `5.6.3`       | 2026-10-01 | `5.6.3` | `v0.21.0`    | `v1.8.0`  | `v4.29.0` | `1.27`       | `3.24`             |
-| `5.6.1`       | 2026-09-07 | `5.6.1` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.27`       | `3.24`             |
-| `5.6.0`       | 2026-09-03 | `5.6.0` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.27`       | `3.24`             |
-| `5.5.4-2`     | 2026-08-31 | `5.5.4` | `v0.21.0`    | `v1.7.0`  | `v4.29.0` | `1.26`       | `3.24`             |
-| `5.5.4`       | 2026-07-28 | `5.5.4` | `v0.20.0`    | `v1.6.0`  | `v4.28.0` | `1.26`       | `3.24`             |
-| `5.5.3` †     | 2026-07-16 | `5.5.3` | `v0.11.4`    | `v1.6.0`  | `v4.28.0` | `1.26`       | `3.24`             |
-| `5.5.1-2` †   | 2026-06-29 | `5.5.1` | `v0.11.4`    | `v1.6.0`  | `v4.27.0` | `1.26`       | `3.24`             |
-| `5.5.1` †     | 2026-06-23 | `5.5.1` | `v0.11.2`    | `v1.6.0`  | `v4.27.0` | `1.26`       | `3.24`             |
-| `5.5.0` †     | 2026-05-29 | `5.5.0` | `v0.11.0`    | `v1.6.0`  | `v4.26.0` | `1.26`       | `3.23`             |
+| Image version | Published  | NIC     | coraza-nginx | libcoraza        | OWASP CRS | Go (builder) | Alpine (CRS stage) |
+| ------------- | ---------- | ------- | ------------ | ---------------- | --------- | ------------ | ------------------ |
+| `5.7.1`       | 2026-11-06 | `5.7.1` | `v0.23.0`    | `main@3ab0726` ‡ | `v4.30.0` | `1.27`       | `3.24`             |
+| `5.7.0`       | 2026-10-21 | `5.7.0` | `v0.23.0`    | `v1.8.0`         | `v4.30.0` | `1.27`       | `3.24`             |
+| `5.6.3`       | 2026-10-01 | `5.6.3` | `v0.21.0`    | `v1.8.0`         | `v4.29.0` | `1.27`       | `3.24`             |
+| `5.6.1`       | 2026-09-07 | `5.6.1` | `v0.21.0`    | `v1.7.0`         | `v4.29.0` | `1.27`       | `3.24`             |
+| `5.6.0`       | 2026-09-03 | `5.6.0` | `v0.21.0`    | `v1.7.0`         | `v4.29.0` | `1.27`       | `3.24`             |
+| `5.5.4-2`     | 2026-08-31 | `5.5.4` | `v0.21.0`    | `v1.7.0`         | `v4.29.0` | `1.26`       | `3.24`             |
+| `5.5.4`       | 2026-07-28 | `5.5.4` | `v0.20.0`    | `v1.6.0`         | `v4.28.0` | `1.26`       | `3.24`             |
+| `5.5.3` †     | 2026-07-16 | `5.5.3` | `v0.11.4`    | `v1.6.0`         | `v4.28.0` | `1.26`       | `3.24`             |
+| `5.5.1-2` †   | 2026-06-29 | `5.5.1` | `v0.11.4`    | `v1.6.0`         | `v4.27.0` | `1.26`       | `3.24`             |
+| `5.5.1` †     | 2026-06-23 | `5.5.1` | `v0.11.2`    | `v1.6.0`         | `v4.27.0` | `1.26`       | `3.24`             |
+| `5.5.0` †     | 2026-05-29 | `5.5.0` | `v0.11.0`    | `v1.6.0`         | `v4.26.0` | `1.26`       | `3.23`             |
 
 † Withdrawn 2026-09-02 — no longer pullable, see [Withdrawn versions](#withdrawn-versions).
+
+‡ Unreleased libcoraza `main` commit (version string `1.8.0`, Coraza `v3.8.1`), pinned until a libcoraza release ships Coraza `>= v3.8.1` — see [5.7.1](#571---2026-11-06).
 
 Older releases (`5.4.3` and earlier) predate this changelog — see the git history of [Dockerfile](Dockerfile) and [VERSION](VERSION).
 
 For details on upstream changes, always check the linked release notes.
 
 ## [Unreleased]
+
+## [5.7.1] - 2026-11-06
+
+### Security
+
+- Coraza engine `v3.7.0` → `v3.8.1`, fixing the twelve [Coraza advisories](https://github.com/corazawaf/coraza/security/advisories) published 2026-10-02. All earlier images embed `v3.7.0` or older and are affected; the shipped `coraza.conf` enables request body access and the JSON body processor, so the body-processor issues apply out of the box. Notable:
+  - [GHSA-6gcq-wc29-5xf2](https://github.com/corazawaf/coraza/security/advisories/GHSA-6gcq-wc29-5xf2) (high): a deeply nested JSON request body overflows the stack and crashes the NGINX worker. Triggers in `DetectionOnly` too, because the body is parsed either way
+  - [GHSA-6r3q-mjv7-xr8m](https://github.com/corazawaf/coraza/security/advisories/GHSA-6r3q-mjv7-xr8m) (high): arguments beyond `ArgumentLimit` were dropped silently, so parameter flooding bypassed `ARGS`-targeted rules
+  - inspection bypasses: [GHSA-5gj4-9gm7-2fx2](https://github.com/corazawaf/coraza/security/advisories/GHSA-5gj4-9gm7-2fx2) (JSON key collision), [GHSA-w253-m66g-rx24](https://github.com/corazawaf/coraza/security/advisories/GHSA-w253-m66g-rx24) (URL-encoded form `Content-Type` parameters), [GHSA-3wr7-993q-jrff](https://github.com/corazawaf/coraza/security/advisories/GHSA-3wr7-993q-jrff) (multipart `filename*`), [GHSA-g4qm-m288-5cp9](https://github.com/corazawaf/coraza/security/advisories/GHSA-g4qm-m288-5cp9) (cookie parser), [GHSA-pc5q-qfxp-ggqv](https://github.com/corazawaf/coraza/security/advisories/GHSA-pc5q-qfxp-ggqv) (`jsDecode`), [GHSA-r3rm-qphw-hh76](https://github.com/corazawaf/coraza/security/advisories/GHSA-r3rm-qphw-hh76) (truncated multipart vs. `MULTIPART_STRICT_ERROR`), [GHSA-x26q-wvhg-fh4m](https://github.com/corazawaf/coraza/security/advisories/GHSA-x26q-wvhg-fh4m) (`ProcessURI` parse failure)
+  - resource exhaustion and log forgery: [GHSA-3c6w-j9xm-8h2h](https://github.com/corazawaf/coraza/security/advisories/GHSA-3c6w-j9xm-8h2h) (JSON response body recursion), [GHSA-rp9v-7xv3-r6g3](https://github.com/corazawaf/coraza/security/advisories/GHSA-rp9v-7xv3-r6g3) (multipart file handles), [GHSA-prpw-wwv7-xjjr](https://github.com/corazawaf/coraza/security/advisories/GHSA-prpw-wwv7-xjjr) (CRLF in native audit-log format)
+
+### Changed
+
+- NIC `5.7.0` → `5.7.1` (NGINX OSS 1.31.7 → 1.31.8) — release notes: [v5.7.1](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.1) (maintenance release: NGINX OSS 1.31.8, Go toolchain 1.27.3, dependency updates)
+- libcoraza `v1.8.0` → `main@3ab0726` ([commit](https://github.com/corazawaf/libcoraza/commit/3ab07264b48fb52f3dc32997f9ae4a3d332cd7a5), 2026-11-01). **Temporary pin:** the latest release `v1.8.0` still embeds Coraza `v3.7.0`; `main` picked up Coraza `v3.8.1` in [#133](https://github.com/corazawaf/libcoraza/pull/133) and also carries `golang.org/x/net` security updates ([#135](https://github.com/corazawaf/libcoraza/pull/135), [#136](https://github.com/corazawaf/libcoraza/pull/136)). The library still reports version `1.8.0`, so coraza-nginx's `>= 1.8.0` gate passes. Return to a release tag as soon as one ships Coraza `>= v3.8.1`
+- coraza-nginx `v0.23.0` and OWASP CRS `v4.30.0` unchanged (already latest)
+- refreshed drifted base-image digests: `golang:1.27-bookworm` (Go 1.27.3, unchanged; base rebuild) and `alpine:3.24` (Alpine 3.24.4)
 
 ## [5.7.0] - 2026-10-21
 
