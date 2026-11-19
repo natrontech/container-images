@@ -17,6 +17,7 @@ When publishing a new version, add a row to the component version matrix **and**
 
 | Image version | Published  | NIC     | coraza-nginx | libcoraza        | OWASP CRS | Go (builder) | Alpine (CRS stage) |
 | ------------- | ---------- | ------- | ------------ | ---------------- | --------- | ------------ | ------------------ |
+| `5.8.0`       | 2026-11-19 | `5.8.0` | `v0.23.0`    | `v1.8.1`         | `v4.30.0` | `1.27`       | `3.24`             |
 | `5.7.1`       | 2026-11-06 | `5.7.1` | `v0.23.0`    | `main@3ab0726` ‡ | `v4.30.0` | `1.27`       | `3.24`             |
 | `5.7.0`       | 2026-10-21 | `5.7.0` | `v0.23.0`    | `v1.8.0`         | `v4.30.0` | `1.27`       | `3.24`             |
 | `5.6.3`       | 2026-10-01 | `5.6.3` | `v0.21.0`    | `v1.8.0`         | `v4.29.0` | `1.27`       | `3.24`             |
@@ -31,13 +32,22 @@ When publishing a new version, add a row to the component version matrix **and**
 
 † Withdrawn 2026-09-02 — no longer pullable, see [Withdrawn versions](#withdrawn-versions).
 
-‡ Unreleased libcoraza `main` commit (version string `1.8.0`, Coraza `v3.8.1`), pinned until a libcoraza release ships Coraza `>= v3.8.1` — see [5.7.1](#571---2026-11-06).
+‡ Unreleased libcoraza `main` commit (version string `1.8.0`, Coraza `v3.8.1`), pinned until a libcoraza release shipped Coraza `>= v3.8.1` — see [5.7.1](#571---2026-11-06). Replaced by `v1.8.1` in [5.8.0](#580---2026-11-19).
 
 Older releases (`5.4.3` and earlier) predate this changelog — see the git history of [Dockerfile](Dockerfile) and [VERSION](VERSION).
 
 For details on upstream changes, always check the linked release notes.
 
 ## [Unreleased]
+
+## [5.8.0] - 2026-11-19
+
+### Changed
+
+- NIC `5.7.1` → `5.8.0` (NGINX OSS 1.31.8 → 1.31.9) — release notes: [v5.8.0](https://github.com/nginx/kubernetes-ingress/releases/tag/v5.8.0) (feature release: `connectionLimit` policy for VirtualServer, VirtualServerRoute and Ingress, JWT claim validation in the JWTAuth policy, variables in the `proxy-set-headers` annotation, auth response headers, self-contained Helm values schema for offline installs, selectable ExternalDNS CRD API version; plus a security-hardening sync and Go toolchain 1.27.4)
+- libcoraza `main@3ab0726` → `v1.8.1` — release notes: [v1.8.1](https://github.com/corazawaf/libcoraza/releases/tag/v1.8.1). Ends the temporary `main` pin from [5.7.1](#571---2026-11-06): the first release to ship Coraza `v3.8.1`. Four commits ahead of the pinned one (`golang.org/x/sync` update and release chores), so the WAF engine is unchanged
+- coraza-nginx `v0.23.0` and OWASP CRS `v4.30.0` unchanged (already latest)
+- refreshed drifted base-image digests: `golang:1.27-bookworm` (Go 1.27.3 → 1.27.4) and `alpine:3.24` (Alpine 3.24.4, unchanged; base rebuild)
 
 ## [5.7.1] - 2026-11-06
 
