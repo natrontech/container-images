@@ -11,7 +11,7 @@
 # redirects to whichever server the user currently has running, with no profile
 # selection, so a student on a GPU profile would otherwise get a 404. See the
 # jupyter-pytorch-nbgitpuller and jupyter-tensorflow-nbgitpuller images.
-FROM quay.io/jupyter/scipy-notebook:2026-11-16@sha256:9d1087eda0dadd6e98763b346fcaa34aa10153067092fac39380669265c3c268
+FROM quay.io/jupyter/scipy-notebook:2026-11-23@sha256:21b93d2df02daa665b11442282d01f96d5a639e8ca9045cfd296e2896709b2fc
 
 # The base image already drops to this user; repeated so the Dockerfile is
 # explicit about not installing as root.
